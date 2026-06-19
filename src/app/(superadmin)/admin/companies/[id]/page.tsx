@@ -1,17 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, Package, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Badge,
-  Button,
-  Card,
+  PageHeader,
   EmptyState,
   Field,
-  Input,
-  PageHeader,
-  Select,
-  Textarea,
-} from "@/components/ui";
+  NativeSelect,
+} from "@/components/primitives";
+import { SubmitButton } from "@/components/submit-button";
 import { variantLabel } from "@/lib/format";
 import { createProduct, createCompanyUser } from "./actions";
 
@@ -37,7 +39,7 @@ export default async function CompanyDetailPage({
       admin
         .from("products")
         .select(
-          "id, name, category, active, max_quantity_per_order, variants:product_variants(id, attributes)",
+          "id, name, category, active, variants:product_variants(id, attributes)",
         )
         .eq("company_id", id)
         .order("created_at", { ascending: false }),
@@ -57,172 +59,204 @@ export default async function CompanyDetailPage({
     <div>
       <Link
         href="/admin/companies"
-        className="mb-4 inline-block text-sm text-muted hover:underline"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        ← All companies
+        <ArrowLeft className="h-4 w-4" /> All companies
       </Link>
 
       <PageHeader
         title={company.name}
         description={`/${company.slug}`}
         action={
-          <div className="flex gap-2">
+          <>
             <span
-              className="h-9 w-9 rounded-lg border border-border"
+              className="h-9 w-9 rounded-lg border"
               style={{ background: company.primary_color }}
             />
             <span
-              className="h-9 w-9 rounded-lg border border-border"
+              className="h-9 w-9 rounded-lg border"
               style={{ background: company.secondary_color }}
             />
-          </div>
+          </>
         }
       />
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Products */}
-        <section>
-          <h2 className="mb-3 text-lg font-semibold">Products</h2>
-          {!products || products.length === 0 ? (
-            <EmptyState title="No products yet" />
-          ) : (
-            <ul className="mb-4 space-y-2">
-              {products.map((p) => (
-                <li
-                  key={p.id}
-                  className="rounded-xl border border-border bg-card p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{p.name}</p>
-                    {p.active ? (
-                      <Badge tone="green">Active</Badge>
-                    ) : (
-                      <Badge>Inactive</Badge>
-                    )}
-                  </div>
-                  {p.variants && p.variants.length > 0 ? (
-                    <p className="mt-1 text-sm text-muted">
-                      {p.variants
-                        .map((v) =>
-                          variantLabel(
-                            v.attributes as Record<string, unknown>,
-                          ),
-                        )
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-sm text-muted">No variants</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+      <Tabs defaultValue="products" className="w-full">
+        <TabsList>
+          <TabsTrigger value="products">
+            <Package className="h-4 w-4" /> Products
+          </TabsTrigger>
+          <TabsTrigger value="users">
+            <Users className="h-4 w-4" /> Users
+          </TabsTrigger>
+        </TabsList>
 
-          <Card>
-            <h3 className="mb-3 font-medium">Add product</h3>
-            <form
-              action={createProduct.bind(null, company.id)}
-              className="space-y-3"
-            >
-              <Field label="Name">
-                <Input name="name" required placeholder="Work jacket" />
-              </Field>
-              <Field label="Description">
-                <Textarea name="description" rows={2} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Category">
-                  <Input name="category" placeholder="Clothing" />
-                </Field>
-                <Field label="Max qty / order" hint="Blank = unlimited">
-                  <Input name="max_quantity_per_order" type="number" min="1" />
-                </Field>
-              </div>
-              <Field label="Image URL" hint="Optional">
-                <Input name="image_url" placeholder="https://…" />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Sizes" hint="Comma-separated">
-                  <Input name="sizes" placeholder="S, M, L, XL" />
-                </Field>
-                <Field label="Colors" hint="Comma-separated">
-                  <Input name="colors" placeholder="Navy, Black" />
-                </Field>
-              </div>
-              <Button type="submit" className="w-full">
-                Add product
-              </Button>
-            </form>
-          </Card>
-        </section>
+        {/* Products */}
+        <TabsContent value="products" className="mt-4">
+          <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+            <div>
+              {!products || products.length === 0 ? (
+                <EmptyState icon={Package} title="No products yet" />
+              ) : (
+                <ul className="space-y-2">
+                  {products.map((p) => (
+                    <li key={p.id} className="rounded-xl border bg-card p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{p.name}</p>
+                          {p.category ? (
+                            <p className="text-xs text-muted-foreground">
+                              {p.category}
+                            </p>
+                          ) : null}
+                        </div>
+                        <Badge variant={p.active ? "default" : "secondary"}>
+                          {p.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                      {p.variants && p.variants.length > 0 ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {p.variants
+                            .map((v) =>
+                              variantLabel(
+                                v.attributes as Record<string, unknown>,
+                              ),
+                            )
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <Card className="h-fit">
+              <CardHeader>
+                <CardTitle className="text-base">Add product</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form
+                  action={createProduct.bind(null, company.id)}
+                  className="space-y-3"
+                >
+                  <Field label="Name">
+                    <Input name="name" required placeholder="Work jacket" />
+                  </Field>
+                  <Field label="Description">
+                    <Textarea name="description" rows={2} />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Category">
+                      <Input name="category" placeholder="Clothing" />
+                    </Field>
+                    <Field label="Max qty/order" hint="Blank = ∞">
+                      <Input
+                        name="max_quantity_per_order"
+                        type="number"
+                        min="1"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Image URL" hint="Optional">
+                    <Input name="image_url" placeholder="https://…" />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Sizes" hint="Comma-separated">
+                      <Input name="sizes" placeholder="S, M, L, XL" />
+                    </Field>
+                    <Field label="Colors" hint="Comma-separated">
+                      <Input name="colors" placeholder="Navy, Black" />
+                    </Field>
+                  </div>
+                  <SubmitButton className="w-full">Add product</SubmitButton>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         {/* Users */}
-        <section>
-          <h2 className="mb-3 text-lg font-semibold">Users</h2>
-          {!users || users.length === 0 ? (
-            <EmptyState title="No users yet" />
-          ) : (
-            <ul className="mb-4 space-y-2">
-              {users.map((u) => (
-                <li
-                  key={u.id}
-                  className="flex items-center justify-between rounded-xl border border-border bg-card p-4"
-                >
-                  <div>
-                    <p className="font-medium">{u.full_name ?? u.email}</p>
-                    <p className="text-xs text-muted">{u.email}</p>
-                  </div>
-                  <Badge tone="blue">
-                    {(u.role as unknown as { name: string } | null)?.name ??
-                      "No role"}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+        <TabsContent value="users" className="mt-4">
+          <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+            <div>
+              {!users || users.length === 0 ? (
+                <EmptyState icon={Users} title="No users yet" />
+              ) : (
+                <ul className="space-y-2">
+                  {users.map((u) => (
+                    <li
+                      key={u.id}
+                      className="flex items-center justify-between rounded-xl border bg-card p-4"
+                    >
+                      <div>
+                        <p className="font-medium">{u.full_name ?? u.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {u.email}
+                        </p>
+                      </div>
+                      <Badge variant="secondary">
+                        {(u.role as unknown as { name: string } | null)?.name ??
+                          "No role"}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-          <Card>
-            <h3 className="mb-3 font-medium">Add user</h3>
-            {!roles || roles.length === 0 ? (
-              <p className="text-sm text-muted">
-                Default roles are still being created. Refresh in a moment.
-              </p>
-            ) : (
-              <form
-                action={createCompanyUser.bind(null, company.id)}
-                className="space-y-3"
-              >
-                <Field label="Full name">
-                  <Input name="full_name" placeholder="Jane Doe" />
-                </Field>
-                <Field label="Email">
-                  <Input name="email" type="email" required />
-                </Field>
-                <Field label="Temporary password">
-                  <Input name="password" type="text" required minLength={6} />
-                </Field>
-                <Field label="Role">
-                  <Select name="role_id" required defaultValue="">
-                    <option value="" disabled>
-                      Select a role…
-                    </option>
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                        {r.requires_order_approval ? " (approval required)" : ""}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Button type="submit" className="w-full">
-                  Create user
-                </Button>
-              </form>
-            )}
-          </Card>
-        </section>
-      </div>
+            <Card className="h-fit">
+              <CardHeader>
+                <CardTitle className="text-base">Add user</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!roles || roles.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Default roles are being created. Refresh in a moment.
+                  </p>
+                ) : (
+                  <form
+                    action={createCompanyUser.bind(null, company.id)}
+                    className="space-y-3"
+                  >
+                    <Field label="Full name">
+                      <Input name="full_name" placeholder="Jane Doe" />
+                    </Field>
+                    <Field label="Email">
+                      <Input name="email" type="email" required />
+                    </Field>
+                    <Field label="Temporary password">
+                      <Input
+                        name="password"
+                        type="text"
+                        required
+                        minLength={6}
+                      />
+                    </Field>
+                    <Field label="Role">
+                      <NativeSelect name="role_id" required defaultValue="">
+                        <option value="" disabled>
+                          Select a role…
+                        </option>
+                        {roles.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                            {r.requires_order_approval
+                              ? " (approval required)"
+                              : ""}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </Field>
+                    <SubmitButton className="w-full">Create user</SubmitButton>
+                  </form>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

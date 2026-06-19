@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/user";
-import { Shell } from "@/components/shell";
+import { AppShell } from "@/components/app-shell";
+import type { SidebarNavItem } from "@/components/app-sidebar";
 
 export const dynamic = "force-dynamic";
 
-const nav = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/companies", label: "Companies" },
+const NAV: SidebarNavItem[] = [
+  { href: "/admin", label: "Dashboard", icon: "dashboard" },
+  { href: "/admin/companies", label: "Companies", icon: "companies" },
 ];
 
 export default async function AdminLayout({
@@ -19,13 +20,15 @@ export default async function AdminLayout({
   if (!user.isSuperadmin) redirect("/dashboard");
 
   return (
-    <Shell
+    <AppShell
       brandName="Alvasi"
       subtitle="Superadmin"
-      nav={nav}
-      userLabel={user.email ?? ""}
+      items={NAV}
+      userName={user.fullName ?? "Alvasi Admin"}
+      userEmail={user.email ?? ""}
+      topbarTitle="Alvasi Admin"
     >
       {children}
-    </Shell>
+    </AppShell>
   );
 }

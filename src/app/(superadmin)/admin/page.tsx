@@ -1,6 +1,12 @@
 import Link from "next/link";
+import { Building2, ClipboardList, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import {
+  PageHeader,
+  StatCard,
+  EmptyState,
+  StatusBadge,
+} from "@/components/primitives";
 import { formatDate, ORDER_STATUS } from "@/lib/format";
 import { NotificationsFeed } from "./notifications-feed";
 
@@ -11,7 +17,11 @@ type OrderRow = {
   status: string;
   created_at: string;
   company: { name: string } | null;
-  items: { quantity: number; product_name: string; variant_label: string | null }[];
+  items: {
+    quantity: number;
+    product_name: string;
+    variant_label: string | null;
+  }[];
 };
 
 export default async function AdminOverview() {
@@ -36,34 +46,35 @@ export default async function AdminOverview() {
     ]);
 
   const orderRows = (orders ?? []) as unknown as OrderRow[];
-  const pending = orderRows.filter((o) => o.status === "pending_approval").length;
+  const pending = orderRows.filter(
+    (o) => o.status === "pending_approval",
+  ).length;
 
   return (
     <div>
       <PageHeader
-        title="Overview"
+        title="Dashboard"
         description="Activity across all your client companies."
       />
 
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Card>
-          <p className="text-sm text-muted">Companies</p>
-          <p className="mt-1 text-3xl font-semibold">{companyCount ?? 0}</p>
-          <Link
-            href="/admin/companies"
-            className="mt-2 inline-block text-sm text-[var(--brand-2)] hover:underline"
-          >
-            Manage →
-          </Link>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">Recent orders</p>
-          <p className="mt-1 text-3xl font-semibold">{orderRows.length}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">Pending approval</p>
-          <p className="mt-1 text-3xl font-semibold">{pending}</p>
-        </Card>
+      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Companies"
+          value={companyCount ?? 0}
+          icon={Building2}
+          accent
+          hint="Active clients"
+        />
+        <StatCard
+          label="Recent orders"
+          value={orderRows.length}
+          icon={ClipboardList}
+        />
+        <StatCard
+          label="Pending approval"
+          value={pending}
+          icon={Clock}
+        />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -72,7 +83,7 @@ export default async function AdminOverview() {
         <div>
           <h2 className="mb-3 text-lg font-semibold">Recent orders</h2>
           {orderRows.length === 0 ? (
-            <EmptyState title="No orders yet" />
+            <EmptyState icon={ClipboardList} title="No orders yet" />
           ) : (
             <ul className="space-y-2">
               {orderRows.map((o) => {
@@ -82,17 +93,16 @@ export default async function AdminOverview() {
                 };
                 const totalQty = o.items.reduce((s, i) => s + i.quantity, 0);
                 return (
-                  <li
-                    key={o.id}
-                    className="rounded-xl border border-border bg-card p-4"
-                  >
+                  <li key={o.id} className="rounded-xl border bg-card p-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium">
                         {o.company?.name ?? "Unknown company"}
                       </p>
-                      <Badge tone={status.tone}>{status.label}</Badge>
+                      <StatusBadge tone={status.tone}>
+                        {status.label}
+                      </StatusBadge>
                     </div>
-                    <p className="mt-1 text-sm text-muted">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {totalQty} item{totalQty === 1 ? "" : "s"} ·{" "}
                       {o.items
                         .map(
@@ -103,7 +113,7 @@ export default async function AdminOverview() {
                         )
                         .join(", ")}
                     </p>
-                    <time className="mt-1 block text-xs text-muted">
+                    <time className="mt-1 block text-xs text-muted-foreground">
                       {formatDate(o.created_at)}
                     </time>
                   </li>

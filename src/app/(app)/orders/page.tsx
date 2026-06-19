@@ -1,6 +1,8 @@
+import { ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
-import { Badge, Button, EmptyState, PageHeader } from "@/components/ui";
+import { PageHeader, EmptyState, StatusBadge } from "@/components/primitives";
+import { SubmitButton } from "@/components/submit-button";
 import { formatDate, ORDER_STATUS } from "@/lib/format";
 import { approveOrder, rejectOrder } from "./actions";
 
@@ -34,7 +36,6 @@ export default async function OrdersPage() {
   const canApprove = can(user, "orders.approve");
   const viewAll = can(user, "orders.view_all");
 
-  // Resolve orderer names (no direct FK from orders to profiles).
   const names = new Map<string, string>();
   if (viewAll && orders.length) {
     const ids = [...new Set(orders.map((o) => o.ordered_by))];
@@ -51,14 +52,13 @@ export default async function OrdersPage() {
       <PageHeader
         title="Orders"
         description={
-          viewAll
-            ? "All orders placed by your company."
-            : "Your order history."
+          viewAll ? "All orders placed by your company." : "Your order history."
         }
       />
 
       {orders.length === 0 ? (
         <EmptyState
+          icon={ClipboardList}
           title="No orders yet"
           description="Orders you place will show up here."
         />
@@ -70,19 +70,16 @@ export default async function OrdersPage() {
               tone: "neutral" as const,
             };
             return (
-              <li
-                key={o.id}
-                className="rounded-xl border border-border bg-card p-4"
-              >
+              <li key={o.id} className="rounded-xl border bg-card p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <Badge tone={status.tone}>{status.label}</Badge>
+                    <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                     {viewAll ? (
                       <span className="text-sm font-medium">
                         {names.get(o.ordered_by) ?? "Team member"}
                       </span>
                     ) : null}
-                    <time className="text-xs text-muted">
+                    <time className="text-xs text-muted-foreground">
                       {formatDate(o.created_at)}
                     </time>
                   </div>
@@ -90,18 +87,12 @@ export default async function OrdersPage() {
                   {canApprove && o.status === "pending_approval" ? (
                     <div className="flex gap-2">
                       <form action={approveOrder.bind(null, o.id)}>
-                        <Button type="submit" className="px-3 py-1.5 text-xs">
-                          Approve
-                        </Button>
+                        <SubmitButton size="sm">Approve</SubmitButton>
                       </form>
                       <form action={rejectOrder.bind(null, o.id)}>
-                        <Button
-                          type="submit"
-                          variant="danger"
-                          className="px-3 py-1.5 text-xs"
-                        >
+                        <SubmitButton size="sm" variant="destructive">
                           Reject
-                        </Button>
+                        </SubmitButton>
                       </form>
                     </div>
                   ) : null}
@@ -113,15 +104,20 @@ export default async function OrdersPage() {
                       <span>
                         {i.product_name}
                         {i.variant_label ? (
-                          <span className="text-muted"> · {i.variant_label}</span>
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {i.variant_label}
+                          </span>
                         ) : null}
                       </span>
-                      <span className="text-muted">×{i.quantity}</span>
+                      <span className="text-muted-foreground">×{i.quantity}</span>
                     </li>
                   ))}
                 </ul>
                 {o.note ? (
-                  <p className="mt-2 text-sm text-muted">Note: {o.note}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Note: {o.note}
+                  </p>
                 ) : null}
               </li>
             );

@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Package, ClipboardList, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
-import { Button, Card, PageHeader } from "@/components/ui";
+import { buttonVariants } from "@/components/ui/button";
+import { PageHeader, StatCard } from "@/components/primitives";
 
 export const dynamic = "force-dynamic";
 
@@ -17,35 +19,38 @@ export default async function DashboardPage() {
     supabase.from("orders").select("*", { count: "exact", head: true }),
   ]);
 
+  const firstName = user?.fullName?.split(" ")[0];
+
   return (
     <div>
       <PageHeader
-        title={`Welcome${user?.fullName ? `, ${user.fullName.split(" ")[0]}` : ""}`}
+        title={`Welcome${firstName ? `, ${firstName}` : ""}`}
         description={`Order ${user?.company?.name ?? "your company"}'s custom products.`}
       />
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
-        <Card>
-          <p className="text-sm text-muted">Products available</p>
-          <p className="mt-1 text-3xl font-semibold">{productCount ?? 0}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-muted">
-            {can(user, "orders.view_all") ? "Company orders" : "Your orders"}
-          </p>
-          <p className="mt-1 text-3xl font-semibold">{orderCount ?? 0}</p>
-        </Card>
+        <StatCard
+          label="Products available"
+          value={productCount ?? 0}
+          icon={Package}
+          accent
+        />
+        <StatCard
+          label={can(user, "orders.view_all") ? "Company orders" : "Your orders"}
+          value={orderCount ?? 0}
+          icon={ClipboardList}
+        />
       </div>
 
       <div className="flex flex-wrap gap-3">
         {can(user, "products.view") ? (
-          <Link href="/products">
-            <Button>Browse products</Button>
+          <Link href="/products" className={buttonVariants()}>
+            Browse products <ArrowRight className="h-4 w-4" />
           </Link>
         ) : null}
         {can(user, "orders.view_own") || can(user, "orders.view_all") ? (
-          <Link href="/orders">
-            <Button variant="secondary">View orders</Button>
+          <Link href="/orders" className={buttonVariants({ variant: "outline" })}>
+            View orders
           </Link>
         ) : null}
       </div>
