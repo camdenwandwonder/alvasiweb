@@ -44,7 +44,7 @@ export function NotificationsFeed({ initial }: { initial: Notif[] }) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-lg font-semibold">Activity</h2>
+        <h2 className="text-lg font-semibold">Activiteit</h2>
         <span
           className={[
             "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs",
@@ -59,15 +59,15 @@ export function NotificationsFeed({ initial }: { initial: Notif[] }) {
               live ? "animate-pulse bg-green-500" : "bg-muted-foreground",
             ].join(" ")}
           />
-          {live ? "Live" : "Connecting…"}
+          {live ? "Live" : "Verbinden…"}
         </span>
       </div>
 
       {items.length === 0 ? (
         <EmptyState
           icon={Bell}
-          title="No activity yet"
-          description="New orders from companies appear here in real time."
+          title="Nog geen activiteit"
+          description="Nieuwe bestellingen van bedrijven verschijnen hier live."
         />
       ) : (
         <ul className="space-y-2">

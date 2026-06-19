@@ -6,9 +6,10 @@ import type { SidebarNavItem } from "@/components/app-sidebar";
 export const dynamic = "force-dynamic";
 
 const NAV: SidebarNavItem[] = [
-  { href: "/admin", label: "Dashboard", icon: "dashboard" },
-  { href: "/admin/companies", label: "Companies", icon: "companies" },
-  { href: "/admin/config", label: "Configuration", icon: "settings" },
+  { href: "/admin", label: "Overzicht", icon: "dashboard" },
+  { href: "/admin/companies", label: "Bedrijven", icon: "companies" },
+  { href: "/admin/catalog", label: "Catalogus", icon: "catalog" },
+  { href: "/admin/config", label: "Configuratie", icon: "settings" },
 ];
 
 export default async function AdminLayout({
@@ -23,11 +24,11 @@ export default async function AdminLayout({
   return (
     <AppShell
       brandName="Alvasi"
-      subtitle="Superadmin"
+      subtitle="Beheer"
       items={NAV}
-      userName={user.fullName ?? "Alvasi Admin"}
+      userName={user.fullName ?? "Alvasi Beheer"}
       userEmail={user.email ?? ""}
-      topbarTitle="Alvasi Admin"
+      topbarTitle="Alvasi Beheer"
     >
       {children}
     </AppShell>

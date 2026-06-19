@@ -46,19 +46,19 @@ export default function LoginPage() {
             A
           </div>
           <h1 className="text-xl font-semibold">Alvasi</h1>
-          <p className="text-sm text-muted-foreground">Ordering platform</p>
+          <p className="text-sm text-muted-foreground">Bestelplatform</p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
+            <CardTitle>Inloggen</CardTitle>
             <CardDescription>
-              Order your company&apos;s custom products.
+              Bestel de producten van jouw bedrijf.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">E-mailadres</Label>
                 <Input
                   id="email"
                   type="email"
@@ -70,7 +70,7 @@ export default function LoginPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Wachtwoord</Label>
                 <Input
                   id="password"
                   type="password"
@@ -87,7 +87,7 @@ export default function LoginPage() {
                 </p>
               ) : null}
               <Button type="submit" disabled={loading} className="w-full">
-                {loading ? "Signing in…" : "Sign in"}
+                {loading ? "Bezig met inloggen…" : "Inloggen"}
               </Button>
             </form>
           </CardContent>

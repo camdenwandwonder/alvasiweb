@@ -22,23 +22,23 @@ export function NewCategoryDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>
-        <Plus className="h-4 w-4" /> New category
+        <Plus className="h-4 w-4" /> Nieuwe categorie
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New category</DialogTitle>
+          <DialogTitle>Nieuwe categorie</DialogTitle>
           <DialogDescription>
-            You can set default rules and option axes after creating it.
+            Standaardregels en optie-assen stel je na het aanmaken in.
           </DialogDescription>
         </DialogHeader>
         <form action={createCategory} className="space-y-4">
-          <Field label="Name">
-            <Input name="name" required placeholder="Clothing" />
+          <Field label="Naam">
+            <Input name="name" required placeholder="Kleding" />
           </Field>
-          <Field label="Description">
+          <Field label="Omschrijving">
             <Textarea name="description" rows={2} />
           </Field>
-          <SubmitButton className="w-full">Create category</SubmitButton>
+          <SubmitButton className="w-full">Categorie aanmaken</SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

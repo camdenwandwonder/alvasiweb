@@ -36,19 +36,19 @@ export default async function CategoriesPage() {
         href="/admin/config"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Configuration
+        <ArrowLeft className="h-4 w-4" /> Configuratie
       </Link>
       <PageHeader
-        title="Categories"
-        description="Each category defines its option axes and default rules for products."
+        title="Categorieën"
+        description="Elke categorie bepaalt zijn optie-assen en standaardregels voor producten."
         action={<NewCategoryDialog />}
       />
 
       {categories.length === 0 ? (
         <EmptyState
           icon={Tags}
-          title="No categories yet"
-          description="Create your first product category."
+          title="Nog geen categorieën"
+          description="Maak je eerste productcategorie aan."
           action={<NewCategoryDialog />}
         />
       ) : (
@@ -59,7 +59,7 @@ export default async function CategoriesPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{c.name}</p>
-                    {!c.active ? <Badge variant="secondary">Inactive</Badge> : null}
+                    {!c.active ? <Badge variant="secondary">Inactief</Badge> : null}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {c.axes.length ? (
@@ -70,14 +70,14 @@ export default async function CategoriesPage() {
                       ))
                     ) : (
                       <span className="text-xs text-muted-foreground">
-                        No option axes
+                        Geen optie-assen
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
-                  {c.default_requires_approval ? <Badge variant="outline">Approval</Badge> : null}
-                  {c.default_requires_proof ? <Badge variant="outline">Proof</Badge> : null}
+                  {c.default_requires_approval ? <Badge variant="outline">Goedkeuring</Badge> : null}
+                  {c.default_requires_proof ? <Badge variant="outline">Proef</Badge> : null}
                   {c.default_max_quantity ? (
                     <Badge variant="outline">Max {c.default_max_quantity}</Badge>
                   ) : null}

@@ -1,22 +1,37 @@
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  return new Date(iso).toLocaleString("nl-NL", {
     dateStyle: "medium",
     timeStyle: "short",
   });
+}
+
+const euro = new Intl.NumberFormat("nl-NL", {
+  style: "currency",
+  currency: "EUR",
+});
+
+export function formatPrice(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return euro.format(value);
 }
 
 export const ORDER_STATUS: Record<
   string,
   { label: string; tone: "neutral" | "green" | "amber" | "red" | "blue" }
 > = {
-  pending_approval: { label: "Pending approval", tone: "amber" },
-  approved: { label: "Approved", tone: "green" },
-  rejected: { label: "Rejected", tone: "red" },
-  fulfilled: { label: "Fulfilled", tone: "blue" },
-  cancelled: { label: "Cancelled", tone: "neutral" },
+  pending_approval: { label: "Wacht op goedkeuring", tone: "amber" },
+  approved: { label: "Goedgekeurd", tone: "green" },
+  rejected: { label: "Afgewezen", tone: "red" },
+  in_production: { label: "In productie", tone: "blue" },
+  shipped: { label: "Verzonden", tone: "blue" },
+  delivered: { label: "Geleverd", tone: "green" },
+  fulfilled: { label: "Afgehandeld", tone: "blue" },
+  cancelled: { label: "Geannuleerd", tone: "neutral" },
 };
 
-export function variantLabel(attributes: Record<string, unknown> | null): string {
+export function variantLabel(
+  attributes: Record<string, unknown> | null,
+): string {
   if (!attributes) return "";
   return Object.entries(attributes)
     .map(([k, v]) => `${k}: ${v}`)

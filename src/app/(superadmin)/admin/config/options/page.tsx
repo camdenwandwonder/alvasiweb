@@ -30,19 +30,19 @@ export default async function OptionsPage() {
         href="/admin/config"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Configuration
+        <ArrowLeft className="h-4 w-4" /> Configuratie
       </Link>
       <PageHeader
-        title="Options & sizes"
-        description="Reusable size systems and color palettes for your categories."
+        title="Opties & maten"
+        description="Herbruikbare matensystemen en kleurpaletten voor je categorieën."
         action={<NewOptionSetDialog />}
       />
 
       {sets.length === 0 ? (
         <EmptyState
           icon={Ruler}
-          title="No option sets yet"
-          description="Create a size system or color palette."
+          title="Nog geen optiesets"
+          description="Maak een matensysteem of kleurpalet aan."
           action={<NewOptionSetDialog />}
         />
       ) : (
@@ -56,7 +56,7 @@ export default async function OptionsPage() {
                     <Badge variant="secondary">{s.kind}</Badge>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {s.values?.[0]?.count ?? 0} values
+                    {s.values?.[0]?.count ?? 0} waarden
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />

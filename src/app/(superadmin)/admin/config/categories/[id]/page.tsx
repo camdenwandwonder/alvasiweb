@@ -38,19 +38,19 @@ export default async function CategoryEditPage({
         href="/admin/config/categories"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Categories
+        <ArrowLeft className="h-4 w-4" /> Categorieën
       </Link>
 
       <form action={updateCategory.bind(null, id)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
+            <CardTitle className="text-base">Gegevens</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Field label="Name">
+            <Field label="Naam">
               <Input name="name" defaultValue={category.name} required />
             </Field>
-            <Field label="Description">
+            <Field label="Omschrijving">
               <Textarea
                 name="description"
                 rows={2}
@@ -64,27 +64,28 @@ export default async function CategoryEditPage({
                 defaultChecked={category.active}
                 className="h-4 w-4 rounded border"
               />
-              Active (available when creating products)
+              Actief (beschikbaar bij het aanmaken van producten)
             </label>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Option axes</CardTitle>
+            <CardTitle className="text-base">Optie-assen</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="mb-3 text-sm text-muted-foreground">
-              Which size systems / palettes products in this category can offer.
+              Welke matensystemen / paletten producten in deze categorie kunnen
+              aanbieden.
             </p>
             {!optionSets || optionSets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No option sets yet —{" "}
+                Nog geen optiesets —{" "}
                 <Link
                   href="/admin/config/options"
                   className="text-[var(--brand-2)] hover:underline"
                 >
-                  create one
+                  maak er een aan
                 </Link>
                 .
               </p>
@@ -115,12 +116,12 @@ export default async function CategoryEditPage({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Default rules</CardTitle>
+            <CardTitle className="text-base">Standaardregels</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              These cascade to every product in this category (a product can
-              override them).
+              Deze werken door naar elk product in deze categorie (een product
+              kan ze overschrijven).
             </p>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -129,7 +130,7 @@ export default async function CategoryEditPage({
                 defaultChecked={category.default_requires_approval}
                 className="h-4 w-4 rounded border"
               />
-              Orders require manager approval by default
+              Bestellingen vereisen standaard goedkeuring van de beheerder
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -138,10 +139,10 @@ export default async function CategoryEditPage({
                 defaultChecked={category.default_requires_proof}
                 className="h-4 w-4 rounded border"
               />
-              Require artwork proof approval before production
+              Ontwerp-proef goedkeuren vóór productie vereist
             </label>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Default max qty / order" hint="Blank = unlimited">
+              <Field label="Standaard max. aantal / bestelling" hint="Leeg = onbeperkt">
                 <Input
                   type="number"
                   name="default_max_quantity"
@@ -149,7 +150,7 @@ export default async function CategoryEditPage({
                   defaultValue={category.default_max_quantity ?? ""}
                 />
               </Field>
-              <Field label="Default lead time (days)">
+              <Field label="Standaard levertijd (dagen)">
                 <Input
                   type="number"
                   name="default_lead_time_days"
@@ -162,7 +163,7 @@ export default async function CategoryEditPage({
         </Card>
 
         <div className="flex items-center justify-between">
-          <SubmitButton>Save changes</SubmitButton>
+          <SubmitButton>Wijzigingen opslaan</SubmitButton>
         </div>
       </form>
 
@@ -171,7 +172,7 @@ export default async function CategoryEditPage({
         className="mt-4 border-t pt-4"
       >
         <SubmitButton variant="destructive" size="sm">
-          Delete category
+          Categorie verwijderen
         </SubmitButton>
       </form>
     </div>

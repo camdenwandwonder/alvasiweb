@@ -37,7 +37,7 @@ export default async function OptionSetPage({
         href="/admin/config/options"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Options & sizes
+        <ArrowLeft className="h-4 w-4" /> Opties & maten
       </Link>
 
       <div className="mb-6 flex items-center gap-2">
@@ -47,11 +47,11 @@ export default async function OptionSetPage({
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-base">Values</CardTitle>
+          <CardTitle className="text-base">Waarden</CardTitle>
         </CardHeader>
         <CardContent>
           {!values || values.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No values yet.</p>
+            <p className="text-sm text-muted-foreground">Nog geen waarden.</p>
           ) : (
             <ul className="mb-4 divide-y rounded-lg border">
               {values.map((v) => (
@@ -86,7 +86,7 @@ export default async function OptionSetPage({
             className="flex flex-wrap items-end gap-3"
           >
             <div className="flex-1">
-              <Field label="Value">
+              <Field label="Waarde">
                 <Input name="value" required placeholder={isColor ? "navy" : "M"} />
               </Field>
             </div>
@@ -96,7 +96,7 @@ export default async function OptionSetPage({
               </Field>
             </div>
             {isColor ? (
-              <Field label="Color">
+              <Field label="Kleur">
                 <input
                   type="color"
                   name="swatch"
@@ -105,14 +105,14 @@ export default async function OptionSetPage({
                 />
               </Field>
             ) : null}
-            <SubmitButton>Add</SubmitButton>
+            <SubmitButton>Toevoegen</SubmitButton>
           </form>
         </CardContent>
       </Card>
 
       <form action={deleteOptionSet.bind(null, id)} className="border-t pt-4">
         <SubmitButton variant="destructive" size="sm">
-          Delete option set
+          Optieset verwijderen
         </SubmitButton>
       </form>
     </div>

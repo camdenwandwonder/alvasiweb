@@ -21,27 +21,27 @@ export function NewOptionSetDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>
-        <Plus className="h-4 w-4" /> New option set
+        <Plus className="h-4 w-4" /> Nieuwe optieset
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New option set</DialogTitle>
+          <DialogTitle>Nieuwe optieset</DialogTitle>
           <DialogDescription>
-            A reusable list of values (a size system or color palette).
+            Een herbruikbare lijst met waarden (een matensysteem of kleurpalet).
           </DialogDescription>
         </DialogHeader>
         <form action={createOptionSet} className="space-y-4">
-          <Field label="Name">
-            <Input name="name" required placeholder="Clothing sizes" />
+          <Field label="Naam">
+            <Input name="name" required placeholder="Kledingmaten" />
           </Field>
           <Field label="Type">
             <NativeSelect name="kind" defaultValue="size">
-              <option value="size">Size system</option>
-              <option value="color">Color palette</option>
-              <option value="text">Other attribute</option>
+              <option value="size">Matensysteem</option>
+              <option value="color">Kleurpalet</option>
+              <option value="text">Ander kenmerk</option>
             </NativeSelect>
           </Field>
-          <SubmitButton className="w-full">Create option set</SubmitButton>
+          <SubmitButton className="w-full">Optieset aanmaken</SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

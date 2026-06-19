@@ -17,24 +17,24 @@ export default async function ConfigOverview() {
     {
       href: "/admin/config/categories",
       icon: Tags,
-      title: "Categories",
-      desc: "Product taxonomy with default rules (approval, limits, proof, lead time) that cascade to every product.",
-      count: `${catCount ?? 0} categories`,
+      title: "Categorieën",
+      desc: "Productindeling met standaardregels (goedkeuring, limieten, proef, levertijd) die doorwerken naar elk product.",
+      count: `${catCount ?? 0} categorieën`,
     },
     {
       href: "/admin/config/options",
       icon: Ruler,
-      title: "Options & sizes",
-      desc: "Reusable size systems and color palettes. Assign them to categories so products offer standard options.",
-      count: `${optCount ?? 0} option sets`,
+      title: "Opties & maten",
+      desc: "Herbruikbare matensystemen en kleurpaletten. Koppel ze aan categorieën zodat producten standaardopties krijgen.",
+      count: `${optCount ?? 0} optiesets`,
     },
   ];
 
   return (
     <div>
       <PageHeader
-        title="Configuration"
-        description="Platform-wide settings that power the catalog for every company."
+        title="Configuratie"
+        description="Platformbrede instellingen die de catalogus voor elk bedrijf aansturen."
       />
       <div className="grid gap-4 sm:grid-cols-2">
         {sections.map((s) => (

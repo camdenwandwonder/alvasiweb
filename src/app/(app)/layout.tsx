@@ -18,10 +18,10 @@ export default async function AppLayout({
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center">
         <div>
-          <h1 className="text-lg font-semibold">No company assigned</h1>
+          <h1 className="text-lg font-semibold">Geen bedrijf gekoppeld</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Your account isn&apos;t linked to a company yet. Please contact your
-            administrator.
+            Je account is nog niet aan een bedrijf gekoppeld. Neem contact op met
+            je beheerder.
           </p>
         </div>
       </div>
@@ -29,17 +29,17 @@ export default async function AppLayout({
   }
 
   const items: SidebarNavItem[] = [
-    { href: "/dashboard", label: "Home", icon: "dashboard" },
+    { href: "/dashboard", label: "Start", icon: "dashboard" },
   ];
   if (can(user, "products.view"))
-    items.push({ href: "/products", label: "Shop", icon: "shop" });
+    items.push({ href: "/products", label: "Winkel", icon: "shop" });
   if (can(user, "orders.view_own") || can(user, "orders.view_all"))
-    items.push({ href: "/orders", label: "Orders", icon: "orders" });
+    items.push({ href: "/orders", label: "Bestellingen", icon: "orders" });
 
   return (
     <AppShell
       brandName={user.company.name}
-      subtitle="Ordering portal"
+      subtitle="Bestelportaal"
       logoUrl={user.company.logo_url}
       primaryColor={user.company.primary_color}
       secondaryColor={user.company.secondary_color}

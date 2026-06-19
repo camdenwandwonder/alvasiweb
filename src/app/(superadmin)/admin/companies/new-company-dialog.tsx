@@ -22,24 +22,24 @@ export function NewCompanyDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>
-        <Plus className="h-4 w-4" /> New company
+        <Plus className="h-4 w-4" /> Nieuw bedrijf
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New company</DialogTitle>
+          <DialogTitle>Nieuw bedrijf</DialogTitle>
           <DialogDescription>
-            Add a client company and configure its branding.
+            Voeg een klantbedrijf toe en stel de huisstijl in.
           </DialogDescription>
         </DialogHeader>
         <form action={createCompany} className="space-y-4">
-          <Field label="Company name">
+          <Field label="Bedrijfsnaam">
             <Input name="name" required placeholder="Acme Workwear" />
           </Field>
-          <Field label="Logo" hint="Optional">
+          <Field label="Logo" hint="Optioneel">
             <ImageUploader name="logo_url" bucket="logos" aspect="square" />
           </Field>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Primary color">
+            <Field label="Primaire kleur">
               <input
                 type="color"
                 name="primary_color"
@@ -47,7 +47,7 @@ export function NewCompanyDialog() {
                 className="h-9 w-full rounded-md border"
               />
             </Field>
-            <Field label="Secondary color">
+            <Field label="Secundaire kleur">
               <input
                 type="color"
                 name="secondary_color"
@@ -56,7 +56,7 @@ export function NewCompanyDialog() {
               />
             </Field>
           </div>
-          <SubmitButton className="w-full">Create company</SubmitButton>
+          <SubmitButton className="w-full">Bedrijf aanmaken</SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

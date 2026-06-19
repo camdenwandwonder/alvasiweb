@@ -24,19 +24,23 @@ export default async function DashboardPage() {
   return (
     <div>
       <PageHeader
-        title={`Welcome${firstName ? `, ${firstName}` : ""}`}
-        description={`Order ${user?.company?.name ?? "your company"}'s custom products.`}
+        title={`Welkom${firstName ? `, ${firstName}` : ""}`}
+        description={`Bestel de producten van ${user?.company?.name ?? "je bedrijf"}.`}
       />
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <StatCard
-          label="Products available"
+          label="Producten beschikbaar"
           value={productCount ?? 0}
           icon={Package}
           accent
         />
         <StatCard
-          label={can(user, "orders.view_all") ? "Company orders" : "Your orders"}
+          label={
+            can(user, "orders.view_all")
+              ? "Bestellingen bedrijf"
+              : "Jouw bestellingen"
+          }
           value={orderCount ?? 0}
           icon={ClipboardList}
         />
@@ -45,12 +49,12 @@ export default async function DashboardPage() {
       <div className="flex flex-wrap gap-3">
         {can(user, "products.view") ? (
           <Link href="/products" className={buttonVariants()}>
-            Browse products <ArrowRight className="h-4 w-4" />
+            Naar de winkel <ArrowRight className="h-4 w-4" />
           </Link>
         ) : null}
         {can(user, "orders.view_own") || can(user, "orders.view_all") ? (
           <Link href="/orders" className={buttonVariants({ variant: "outline" })}>
-            View orders
+            Bestellingen bekijken
           </Link>
         ) : null}
       </div>

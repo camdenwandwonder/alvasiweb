@@ -53,37 +53,33 @@ export default async function AdminOverview() {
   return (
     <div>
       <PageHeader
-        title="Dashboard"
-        description="Activity across all your client companies."
+        title="Overzicht"
+        description="Activiteit van al je klantbedrijven."
       />
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <StatCard
-          label="Companies"
+          label="Bedrijven"
           value={companyCount ?? 0}
           icon={Building2}
           accent
-          hint="Active clients"
+          hint="Actieve klanten"
         />
         <StatCard
-          label="Recent orders"
+          label="Recente bestellingen"
           value={orderRows.length}
           icon={ClipboardList}
         />
-        <StatCard
-          label="Pending approval"
-          value={pending}
-          icon={Clock}
-        />
+        <StatCard label="Wacht op goedkeuring" value={pending} icon={Clock} />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
         <NotificationsFeed initial={notifs ?? []} />
 
         <div>
-          <h2 className="mb-3 text-lg font-semibold">Recent orders</h2>
+          <h2 className="mb-3 text-lg font-semibold">Recente bestellingen</h2>
           {orderRows.length === 0 ? (
-            <EmptyState icon={ClipboardList} title="No orders yet" />
+            <EmptyState icon={ClipboardList} title="Nog geen bestellingen" />
           ) : (
             <ul className="space-y-2">
               {orderRows.map((o) => {
@@ -96,14 +92,14 @@ export default async function AdminOverview() {
                   <li key={o.id} className="rounded-xl border bg-card p-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium">
-                        {o.company?.name ?? "Unknown company"}
+                        {o.company?.name ?? "Onbekend bedrijf"}
                       </p>
                       <StatusBadge tone={status.tone}>
                         {status.label}
                       </StatusBadge>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {totalQty} item{totalQty === 1 ? "" : "s"} ·{" "}
+                      {totalQty} artikel{totalQty === 1 ? "" : "en"} ·{" "}
                       {o.items
                         .map(
                           (i) =>

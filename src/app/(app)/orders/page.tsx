@@ -44,23 +44,25 @@ export default async function OrdersPage() {
       .select("id, full_name, email")
       .in("id", ids);
     for (const p of profiles ?? [])
-      names.set(p.id, p.full_name ?? p.email ?? "Team member");
+      names.set(p.id, p.full_name ?? p.email ?? "Teamlid");
   }
 
   return (
     <div>
       <PageHeader
-        title="Orders"
+        title="Bestellingen"
         description={
-          viewAll ? "All orders placed by your company." : "Your order history."
+          viewAll
+            ? "Alle bestellingen van je bedrijf."
+            : "Jouw bestelgeschiedenis."
         }
       />
 
       {orders.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
-          title="No orders yet"
-          description="Orders you place will show up here."
+          title="Nog geen bestellingen"
+          description="Bestellingen die je plaatst verschijnen hier."
         />
       ) : (
         <ul className="space-y-3">
@@ -76,7 +78,7 @@ export default async function OrdersPage() {
                     <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                     {viewAll ? (
                       <span className="text-sm font-medium">
-                        {names.get(o.ordered_by) ?? "Team member"}
+                        {names.get(o.ordered_by) ?? "Teamlid"}
                       </span>
                     ) : null}
                     <time className="text-xs text-muted-foreground">
@@ -87,11 +89,11 @@ export default async function OrdersPage() {
                   {canApprove && o.status === "pending_approval" ? (
                     <div className="flex gap-2">
                       <form action={approveOrder.bind(null, o.id)}>
-                        <SubmitButton size="sm">Approve</SubmitButton>
+                        <SubmitButton size="sm">Goedkeuren</SubmitButton>
                       </form>
                       <form action={rejectOrder.bind(null, o.id)}>
                         <SubmitButton size="sm" variant="destructive">
-                          Reject
+                          Afwijzen
                         </SubmitButton>
                       </form>
                     </div>
@@ -116,7 +118,7 @@ export default async function OrdersPage() {
                 </ul>
                 {o.note ? (
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Note: {o.note}
+                    Notitie: {o.note}
                   </p>
                 ) : null}
               </li>

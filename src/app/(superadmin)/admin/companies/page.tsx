@@ -19,16 +19,16 @@ export default async function CompaniesPage() {
   return (
     <div>
       <PageHeader
-        title="Companies"
-        description="Your client companies and their branded portals."
+        title="Bedrijven"
+        description="Je klantbedrijven en hun gebrande portalen."
         action={<NewCompanyDialog />}
       />
 
       {!companies || companies.length === 0 ? (
         <EmptyState
           icon={Building2}
-          title="No companies yet"
-          description="Create your first client company to get started."
+          title="Nog geen bedrijven"
+          description="Maak je eerste klantbedrijf aan om te beginnen."
           action={<NewCompanyDialog />}
         />
       ) : (
@@ -57,8 +57,8 @@ export default async function CompaniesPage() {
                   </div>
                   <div className="mt-4 flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      {productCount} product{productCount === 1 ? "" : "s"} ·{" "}
-                      {userCount} user{userCount === 1 ? "" : "s"}
+                      {productCount} product{productCount === 1 ? "" : "en"} ·{" "}
+                      {userCount} gebruiker{userCount === 1 ? "" : "s"}
                     </p>
                     <div className="flex gap-1.5">
                       <span
