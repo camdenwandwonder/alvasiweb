@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const NAV: SidebarNavItem[] = [
   { href: "/admin", label: "Dashboard", icon: "dashboard" },
   { href: "/admin/companies", label: "Companies", icon: "companies" },
+  { href: "/admin/config", label: "Configuration", icon: "settings" },
 ];
 
 export default async function AdminLayout({
