@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
+import { ImageUploader } from "@/components/image-uploader";
 import { createCompany } from "./actions";
 
 export function NewCompanyDialog() {
@@ -34,8 +35,8 @@ export function NewCompanyDialog() {
           <Field label="Company name">
             <Input name="name" required placeholder="Acme Workwear" />
           </Field>
-          <Field label="Logo URL" hint="Optional — paste an image URL for now.">
-            <Input name="logo_url" placeholder="https://…/logo.png" />
+          <Field label="Logo" hint="Optional">
+            <ImageUploader name="logo_url" bucket="logos" aspect="square" />
           </Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Primary color">

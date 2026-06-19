@@ -14,6 +14,7 @@ import {
   NativeSelect,
 } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
+import { ImageUploader } from "@/components/image-uploader";
 import { variantLabel } from "@/lib/format";
 import { createProduct, createCompanyUser } from "./actions";
 
@@ -159,8 +160,8 @@ export default async function CompanyDetailPage({
                       />
                     </Field>
                   </div>
-                  <Field label="Image URL" hint="Optional">
-                    <Input name="image_url" placeholder="https://…" />
+                  <Field label="Product image" hint="Optional">
+                    <ImageUploader name="image_url" bucket="product-images" />
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Sizes" hint="Comma-separated">
