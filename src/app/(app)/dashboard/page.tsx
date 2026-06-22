@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
 import { buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatCard } from "@/components/primitives";
+import { AtmosphereHero } from "@/components/atmosphere-hero";
 
 export const dynamic = "force-dynamic";
 
@@ -11,22 +12,32 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   const supabase = await createClient();
 
-  const [{ count: productCount }, { count: orderCount }] = await Promise.all([
-    supabase
-      .from("products")
-      .select("*", { count: "exact", head: true })
-      .eq("active", true),
-    supabase.from("orders").select("*", { count: "exact", head: true }),
-  ]);
+  const [{ count: productCount }, { count: orderCount }, { data: media }] =
+    await Promise.all([
+      supabase
+        .from("products")
+        .select("*", { count: "exact", head: true })
+        .eq("active", true),
+      supabase.from("orders").select("*", { count: "exact", head: true }),
+      supabase
+        .from("company_media")
+        .select("url")
+        .eq("company_id", user?.companyId ?? "")
+        .order("sort_order"),
+    ]);
 
   const firstName = user?.fullName?.split(" ")[0];
+  const title = `Welkom${firstName ? `, ${firstName}` : ""}`;
+  const subtitle = `Bestel de producten van ${user?.company?.name ?? "je bedrijf"}.`;
+  const heroImages = (media ?? []).map((m) => m.url);
 
   return (
     <div>
-      <PageHeader
-        title={`Welkom${firstName ? `, ${firstName}` : ""}`}
-        description={`Bestel de producten van ${user?.company?.name ?? "je bedrijf"}.`}
-      />
+      {heroImages.length > 0 ? (
+        <AtmosphereHero images={heroImages} title={title} subtitle={subtitle} />
+      ) : (
+        <PageHeader title={title} description={subtitle} />
+      )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <StatCard

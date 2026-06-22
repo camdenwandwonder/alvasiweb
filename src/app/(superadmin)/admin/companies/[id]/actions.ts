@@ -40,6 +40,26 @@ export async function deleteCompany(id: string) {
   redirect("/admin/companies");
 }
 
+export async function addCompanyMediaUrl(companyId: string, url: string) {
+  await requireSuperadmin();
+  if (!url) return;
+  const admin = createAdminClient();
+  const { count } = await admin
+    .from("company_media")
+    .select("*", { count: "exact", head: true })
+    .eq("company_id", companyId);
+  await admin
+    .from("company_media")
+    .insert({ company_id: companyId, url, sort_order: (count ?? 0) + 1 });
+  revalidatePath(`/admin/companies/${companyId}`);
+}
+
+export async function removeCompanyMedia(companyId: string, id: string) {
+  await requireSuperadmin();
+  await createAdminClient().from("company_media").delete().eq("id", id);
+  revalidatePath(`/admin/companies/${companyId}`);
+}
+
 export async function setCompanyCategoryVisibility(
   companyId: string,
   categoryId: string,

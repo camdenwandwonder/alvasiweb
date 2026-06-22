@@ -9,6 +9,7 @@ import {
   Palette,
   Eye,
   Wallet,
+  Images,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,7 @@ import { BrandPreview } from "@/components/brand-preview";
 import { ProductThumb } from "@/components/product-thumb";
 import { BudgetSettingsPanel } from "@/components/budget-settings-panel";
 import type { BudgetMode } from "@/lib/allowance";
+import { CompanyMedia } from "./company-media";
 import { formatPrice } from "@/lib/format";
 import {
   createCompanyUser,
@@ -68,6 +70,7 @@ export default async function CompanyDetailPage({
     { data: crv },
     { data: budgets },
     { data: allotments },
+    { data: media },
   ] = await Promise.all([
     admin
       .from("products")
@@ -100,6 +103,11 @@ export default async function CompanyDetailPage({
       .select("id, scope, target_id, product_id, max_quantity, period")
       .eq("company_id", id)
       .order("created_at", { ascending: false }),
+    admin
+      .from("company_media")
+      .select("id, url")
+      .eq("company_id", id)
+      .order("sort_order"),
   ]);
 
   const productList = products ?? [];
@@ -157,6 +165,9 @@ export default async function CompanyDetailPage({
           </TabsTrigger>
           <TabsTrigger value="budget">
             <Wallet className="h-4 w-4" /> Bestelwijze
+          </TabsTrigger>
+          <TabsTrigger value="media">
+            <Images className="h-4 w-4" /> Sfeerbeelden
           </TabsTrigger>
         </TabsList>
 
@@ -429,6 +440,18 @@ export default async function CompanyDetailPage({
             budgets={(budgets ?? []) as never}
             allotments={(allotments ?? []) as never}
           />
+        </TabsContent>
+
+        {/* Sfeerbeelden */}
+        <TabsContent value="media" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Sfeerbeelden</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CompanyMedia companyId={id} images={media ?? []} />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

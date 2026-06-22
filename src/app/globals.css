@@ -139,3 +139,29 @@ body {
     @apply font-sans;
   }
 }
+
+@keyframes alvasi-kenburns {
+  0% {
+    transform: scale(1.05) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.2) translate(-2.5%, -2.5%);
+  }
+}
+.animate-kenburns {
+  animation: alvasi-kenburns 16s ease-in-out infinite alternate;
+}
+
+@keyframes alvasi-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: alvasi-fade-up 0.6s ease-out both;
+}
