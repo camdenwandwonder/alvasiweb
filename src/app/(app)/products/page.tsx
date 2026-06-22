@@ -1,48 +1,49 @@
-import { Package } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
-import { Card } from "@/components/ui/card";
-import { PageHeader, EmptyState } from "@/components/primitives";
-import { AddToCart } from "@/components/add-to-cart";
-import { ProductThumb } from "@/components/product-thumb";
+import { PageHeader } from "@/components/primitives";
+import { ShopGrid, type ShopProduct } from "@/components/shop-grid";
+import { getAllowance } from "@/lib/allowance";
 import { formatPrice } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-type Variant = {
-  id: string;
-  attributes: Record<string, unknown>;
-  price_override: number | null;
+const PERIOD: Record<string, string> = {
+  monthly: "deze maand",
+  quarterly: "dit kwartaal",
+  yearly: "dit jaar",
+  once: "totaal",
 };
-type Image = { url: string; is_primary: boolean };
-type Product = {
+
+type Raw = {
   id: string;
   name: string;
   description: string | null;
   base_price: number | null;
   category_id: string | null;
   category: { name: string } | null;
-  variants: Variant[];
-  images: Image[];
+  variants: ShopProduct["variants"];
+  images: ShopProduct["images"];
 };
 
 export default async function ProductsPage() {
   const user = await getCurrentUser();
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("products")
-    .select(
-      "id, name, description, base_price, category_id, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
-    )
-    .eq("status", "active")
-    .order("name");
+  const [{ data }, allowance] = await Promise.all([
+    supabase
+      .from("products")
+      .select(
+        "id, name, description, base_price, category_id, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
+      )
+      .eq("status", "active")
+      .order("name"),
+    getAllowance(user),
+  ]);
 
-  let products = (data ?? []) as unknown as Product[];
-  const canOrder = can(user, "orders.create");
+  let raw = (data ?? []) as unknown as Raw[];
 
-  // Role-based catalog visibility: members only see categories allowed for their
-  // role. Managers (orders.view_all) and superadmin see everything.
+  // Role-based catalog visibility (members only see allowed categories).
   if (user?.companyId && !can(user, "orders.view_all")) {
     const { data: rules } = await supabase
       .from("category_role_visibility")
@@ -54,13 +55,34 @@ export default async function ProductsPage() {
       s.add(r.role_id);
       allowed.set(r.category_id, s);
     }
-    products = products.filter((p) => {
+    raw = raw.filter((p) => {
       if (!p.category_id) return true;
       const set = allowed.get(p.category_id);
-      if (!set) return true; // unrestricted category
+      if (!set) return true;
       return user.roleId ? set.has(user.roleId) : false;
     });
   }
+
+  const products: ShopProduct[] = raw.map((p) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    base_price: p.base_price,
+    category_id: p.category_id,
+    category_name: p.category?.name ?? null,
+    variants: p.variants ?? [],
+    images: p.images ?? [],
+  }));
+
+  const catMap = new Map<string, string>();
+  for (const p of products)
+    if (p.category_id && p.category_name) catMap.set(p.category_id, p.category_name);
+  const categories = [...catMap.entries()].map(([id, name]) => ({ id, name }));
+
+  const pct =
+    allowance.hasLimit && allowance.total
+      ? Math.min(100, Math.max(0, (allowance.used / allowance.total) * 100))
+      : 0;
 
   return (
     <div>
@@ -69,66 +91,36 @@ export default async function ProductsPage() {
         description="Blader door en bestel de producten van jouw bedrijf."
       />
 
-      {products.length === 0 ? (
-        <EmptyState
-          icon={Package}
-          title="Geen producten beschikbaar"
-          description="Je beheerder heeft nog geen producten toegevoegd."
-        />
-      ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((p) => {
-            return (
-              <Card
-                key={p.id}
-                className="group flex flex-col overflow-hidden p-0"
-              >
-                <ProductThumb
-                  images={p.images ?? []}
-                  alt={p.name}
-                  className="aspect-square w-full"
-                />
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-medium">{p.name}</h3>
-                      <span className="shrink-0 text-sm font-medium">
-                        {formatPrice(p.base_price)}
-                      </span>
-                    </div>
-                    {p.category ? (
-                      <p className="text-xs text-muted-foreground">
-                        {p.category.name}
-                      </p>
-                    ) : null}
-                    {p.description ? (
-                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                        {p.description}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  {canOrder ? (
-                    <div className="mt-4">
-                      <AddToCart
-                        productId={p.id}
-                        name={p.name}
-                        basePrice={p.base_price}
-                        image={
-                          p.images?.find((i) => i.is_primary)?.url ??
-                          p.images?.[0]?.url ??
-                          null
-                        }
-                        variants={p.variants ?? []}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              </Card>
-            );
-          })}
+      {allowance.hasLimit && allowance.mode === "euro" ? (
+        <div className="mb-6 rounded-xl border bg-card p-4">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <Wallet className="h-4 w-4 text-[var(--brand)]" /> Resterend budget
+              {allowance.period ? ` (${PERIOD[allowance.period]})` : ""}
+            </span>
+            <span className="text-sm">
+              <span className="font-semibold">
+                {formatPrice(allowance.remaining)}
+              </span>{" "}
+              <span className="text-muted-foreground">
+                van {formatPrice(allowance.total)}
+              </span>
+            </span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-[var(--brand)]"
+              style={{ width: `${100 - pct}%` }}
+            />
+          </div>
         </div>
-      )}
+      ) : null}
+
+      <ShopGrid
+        products={products}
+        categories={categories}
+        canOrder={can(user, "orders.create")}
+      />
     </div>
   );
 }
