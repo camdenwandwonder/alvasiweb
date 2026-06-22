@@ -240,19 +240,19 @@ export default async function CategoryEditPage({
                           name="value"
                           required
                           placeholder={isColor ? "navy" : "M"}
-                          className="h-8 w-28"
+                          className="h-9 w-28"
                         />
                         <Input
                           name="label"
                           placeholder={isColor ? "Navy" : "Label (optioneel)"}
-                          className="h-8 w-40"
+                          className="h-9 w-40"
                         />
                         {isColor ? (
                           <input
                             type="color"
                             name="swatch"
                             defaultValue="#1e293b"
-                            className="h-8 w-10 rounded-md border"
+                            className="h-9 w-11 rounded-md border"
                           />
                         ) : null}
                         <SubmitButton variant="outline" size="sm">
@@ -273,7 +273,7 @@ export default async function CategoryEditPage({
               <Field label="Nieuwe optie-as">
                 <Input name="name" required placeholder="bijv. Maat of Kleur" className="w-48" />
               </Field>
-              <NativeSelect name="kind" defaultValue="size" className="h-9 w-40">
+              <NativeSelect name="kind" defaultValue="size" className="w-40">
                 <option value="size">Maten</option>
                 <option value="color">Kleuren</option>
                 <option value="text">Ander kenmerk</option>

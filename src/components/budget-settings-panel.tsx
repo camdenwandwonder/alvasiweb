@@ -118,12 +118,12 @@ export function BudgetSettingsPanel({
         <CardContent>
           <form
             action={saveApprovalThreshold.bind(null, companyId)}
-            className="flex flex-wrap items-end gap-3"
+            className="space-y-1.5"
           >
-            <Field
-              label={`Goedkeuring vereist boven bedrag (${unit})`}
-              hint="Leeg = geen drempel."
-            >
+            <label className="text-sm font-medium">
+              {`Goedkeuring vereist boven bedrag (${unit})`}
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
               <Input
                 name="approval_over_amount"
                 type="number"
@@ -132,8 +132,9 @@ export function BudgetSettingsPanel({
                 defaultValue={approvalThreshold}
                 className="w-48"
               />
-            </Field>
-            <SubmitButton>Opslaan</SubmitButton>
+              <SubmitButton>Opslaan</SubmitButton>
+            </div>
+            <p className="text-xs text-muted-foreground">Leeg = geen drempel.</p>
           </form>
         </CardContent>
       </Card>
