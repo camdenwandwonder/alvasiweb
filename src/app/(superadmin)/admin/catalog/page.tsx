@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { PageHeader, EmptyState } from "@/components/primitives";
+import { ProductThumb } from "@/components/product-thumb";
 import { formatPrice } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -62,24 +63,15 @@ export default async function CatalogPage() {
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {products.map((p) => {
-            const img =
-              p.images?.find((i) => i.is_primary)?.url ?? p.images?.[0]?.url;
             const status = STATUS[p.status] ?? STATUS.active;
             return (
-              <Link key={p.id} href={`/admin/catalog/${p.id}`}>
+              <Link key={p.id} href={`/admin/catalog/${p.id}`} className="group">
                 <Card className="overflow-hidden p-0 transition hover:border-foreground/20 hover:shadow-md">
-                  {img ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={img}
-                      alt={p.name}
-                      className="aspect-square w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex aspect-square w-full items-center justify-center bg-muted text-muted-foreground">
-                      <Package className="h-8 w-8" />
-                    </div>
-                  )}
+                  <ProductThumb
+                    images={p.images ?? []}
+                    alt={p.name}
+                    className="aspect-square w-full"
+                  />
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium leading-tight">{p.name}</p>

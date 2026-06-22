@@ -18,6 +18,133 @@ function num(v: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Single save for the whole product editor (used by autosave + the Save button).
+ * Optionally regenerates the variant matrix from the selected option values.
+ */
+export async function saveProduct(
+  productId: string,
+  companyId: string,
+  payload: {
+    name: string;
+    category_id: string | null;
+    status: string;
+    description: string | null;
+    base_price: number | null;
+    max_quantity_per_order: number | null;
+    regenVariants?: boolean;
+    selections?: Record<string, string[]>;
+  },
+) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+
+  await admin
+    .from("products")
+    .update({
+      name: payload.name?.trim() || "Naamloos product",
+      category_id: payload.category_id || null,
+      status: ["draft", "active", "archived"].includes(payload.status)
+        ? payload.status
+        : "active",
+      description: payload.description?.trim() || null,
+      base_price: payload.base_price,
+      max_quantity_per_order: payload.max_quantity_per_order,
+    })
+    .eq("id", productId);
+
+  if (payload.regenVariants) {
+    const { data: product } = await admin
+      .from("products")
+      .select("category_id")
+      .eq("id", productId)
+      .single();
+    const { data: catAxes } = await admin
+      .from("category_option_sets")
+      .select(
+        "axis_role, sort_order, option_set:option_sets(id, name, kind, values:option_values(id, value, label, sort_order))",
+      )
+      .eq("category_id", product?.category_id ?? "")
+      .order("sort_order");
+
+    type AxisVal = { id: string; label: string };
+    const axes: { setId: string; label: string; selected: AxisVal[] }[] = [];
+    for (const a of catAxes ?? []) {
+      const set = a.option_set as unknown as {
+        id: string;
+        name: string;
+        kind: string;
+        values: { id: string; value: string; label: string | null; sort_order: number }[];
+      };
+      const chosen = payload.selections?.[set.id] ?? [];
+      if (!chosen.length) continue;
+      const axisLabel =
+        a.axis_role === "size" ? "Maat" : a.axis_role === "color" ? "Kleur" : set.name;
+      const selected = set.values
+        .filter((v) => chosen.includes(v.id))
+        .sort((x, y) => x.sort_order - y.sort_order)
+        .map((v) => ({ id: v.id, label: v.label ?? v.value }));
+      axes.push({ setId: set.id, label: axisLabel, selected });
+    }
+
+    await admin.from("product_options").delete().eq("product_id", productId);
+    if (axes.length) {
+      await admin.from("product_options").insert(
+        axes.map((ax, i) => ({
+          product_id: productId,
+          company_id: companyId,
+          option_set_id: ax.setId,
+          selected_value_ids: ax.selected.map((s) => s.id),
+          sort_order: i + 1,
+        })),
+      );
+    }
+
+    await admin.from("product_variants").delete().eq("product_id", productId);
+    let combos: Record<string, string>[] = [{}];
+    for (const ax of axes) {
+      const next: Record<string, string>[] = [];
+      for (const combo of combos)
+        for (const val of ax.selected) next.push({ ...combo, [ax.label]: val.label });
+      combos = next;
+    }
+    if (axes.length && combos.length) {
+      await admin.from("product_variants").insert(
+        combos.map((attributes) => ({
+          product_id: productId,
+          company_id: companyId,
+          attributes,
+          active: true,
+        })),
+      );
+    }
+  }
+
+  revalidatePath(`/admin/catalog/${productId}`);
+  revalidatePath("/admin/catalog");
+}
+
+export async function addProductImageUrl(
+  productId: string,
+  companyId: string,
+  url: string,
+) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { count } = await admin
+    .from("product_images")
+    .select("*", { count: "exact", head: true })
+    .eq("product_id", productId);
+  await admin.from("product_images").insert({
+    product_id: productId,
+    company_id: companyId,
+    url,
+    sort_order: (count ?? 0) + 1,
+    is_primary: (count ?? 0) === 0,
+  });
+  revalidatePath(`/admin/catalog/${productId}`);
+}
+
 export async function createProductDraft(formData: FormData) {
   const user = await requireSuperadmin();
   const admin = createAdminClient();

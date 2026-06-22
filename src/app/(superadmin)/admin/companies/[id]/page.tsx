@@ -26,6 +26,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { CompanyBrandingForm } from "@/components/company-branding-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BrandPreview } from "@/components/brand-preview";
+import { ProductThumb } from "@/components/product-thumb";
 import { formatPrice } from "@/lib/format";
 import {
   createCompanyUser,
@@ -204,26 +205,23 @@ export default async function CompanyDetailPage({
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {productList.map((p) => {
-                const img =
-                  (p.images as { url: string; is_primary: boolean }[] | null)?.find(
-                    (i) => i.is_primary,
-                  )?.url ??
-                  (p.images as { url: string }[] | null)?.[0]?.url;
                 return (
-                  <Link key={p.id} href={`/admin/catalog/${p.id}`}>
+                  <Link
+                    key={p.id}
+                    href={`/admin/catalog/${p.id}`}
+                    className="group"
+                  >
                     <Card className="overflow-hidden p-0 transition hover:border-foreground/20">
-                      {img ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={img}
-                          alt={p.name}
-                          className="aspect-square w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex aspect-square w-full items-center justify-center bg-muted text-muted-foreground">
-                          <Package className="h-7 w-7" />
-                        </div>
-                      )}
+                      <ProductThumb
+                        images={
+                          (p.images as unknown as {
+                            url: string;
+                            is_primary: boolean;
+                          }[]) ?? []
+                        }
+                        alt={p.name}
+                        className="aspect-square w-full"
+                      />
                       <div className="p-4">
                         <div className="flex items-start justify-between gap-2">
                           <p className="font-medium leading-tight">{p.name}</p>

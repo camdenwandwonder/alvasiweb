@@ -4,6 +4,7 @@ import { getCurrentUser, can } from "@/lib/auth/user";
 import { Card } from "@/components/ui/card";
 import { PageHeader, EmptyState } from "@/components/primitives";
 import { AddToCart } from "@/components/add-to-cart";
+import { ProductThumb } from "@/components/product-thumb";
 import { formatPrice } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -77,22 +78,16 @@ export default async function ProductsPage() {
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((p) => {
-            const img =
-              p.images?.find((i) => i.is_primary)?.url ?? p.images?.[0]?.url;
             return (
-              <Card key={p.id} className="flex flex-col overflow-hidden p-0">
-                {img ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={img}
-                    alt={p.name}
-                    className="aspect-square w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex aspect-square w-full items-center justify-center bg-muted text-muted-foreground">
-                    <Package className="h-8 w-8" />
-                  </div>
-                )}
+              <Card
+                key={p.id}
+                className="group flex flex-col overflow-hidden p-0"
+              >
+                <ProductThumb
+                  images={p.images ?? []}
+                  alt={p.name}
+                  className="aspect-square w-full"
+                />
                 <div className="flex flex-1 flex-col p-5">
                   <div className="flex-1">
                     <div className="flex items-start justify-between gap-2">
@@ -119,7 +114,11 @@ export default async function ProductsPage() {
                         productId={p.id}
                         name={p.name}
                         basePrice={p.base_price}
-                        image={img ?? null}
+                        image={
+                          p.images?.find((i) => i.is_primary)?.url ??
+                          p.images?.[0]?.url ??
+                          null
+                        }
                         variants={p.variants ?? []}
                       />
                     </div>
