@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Package, Users, Plus, LayoutDashboard, Palette } from "lucide-react";
+import {
+  ArrowLeft,
+  Package,
+  Users,
+  Plus,
+  LayoutDashboard,
+  Palette,
+  Eye,
+} from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,7 +27,12 @@ import { CompanyBrandingForm } from "@/components/company-branding-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BrandPreview } from "@/components/brand-preview";
 import { formatPrice } from "@/lib/format";
-import { createCompanyUser, updateCompany, deleteCompany } from "./actions";
+import {
+  createCompanyUser,
+  updateCompany,
+  deleteCompany,
+  setCompanyCategoryVisibility,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -44,12 +57,12 @@ export default async function CompanyDetailPage({
     .maybeSingle();
   if (!company) notFound();
 
-  const [{ data: products }, { data: roles }, { data: users }] =
+  const [{ data: products }, { data: roles }, { data: users }, { data: crv }] =
     await Promise.all([
       admin
         .from("products")
         .select(
-          "id, name, status, base_price, category:categories(name), images:product_images(url, is_primary)",
+          "id, name, status, base_price, category:categories(id, name), images:product_images(url, is_primary)",
         )
         .eq("company_id", id)
         .order("created_at", { ascending: false }),
@@ -63,10 +76,32 @@ export default async function CompanyDetailPage({
         .select("id, full_name, email, status, role:roles(name)")
         .eq("company_id", id)
         .order("created_at", { ascending: false }),
+      admin
+        .from("category_role_visibility")
+        .select("category_id, role_id")
+        .eq("company_id", id),
     ]);
 
   const productList = products ?? [];
   const userList = users ?? [];
+  const roleList = roles ?? [];
+
+  // Distinct categories used by this company's catalog (for visibility tab).
+  const catMap = new Map<string, string>();
+  for (const p of productList) {
+    const c = p.category as unknown as { id: string; name: string } | null;
+    if (c) catMap.set(c.id, c.name);
+  }
+  const usedCategories = [...catMap.entries()].map(([cid, name]) => ({
+    id: cid,
+    name,
+  }));
+  const allowedByCat = new Map<string, Set<string>>();
+  for (const r of crv ?? []) {
+    const s = allowedByCat.get(r.category_id) ?? new Set<string>();
+    s.add(r.role_id);
+    allowedByCat.set(r.category_id, s);
+  }
 
   return (
     <div>
@@ -92,6 +127,9 @@ export default async function CompanyDetailPage({
           </TabsTrigger>
           <TabsTrigger value="users">
             <Users className="h-4 w-4" /> Gebruikers
+          </TabsTrigger>
+          <TabsTrigger value="visibility">
+            <Eye className="h-4 w-4" /> Zichtbaarheid
           </TabsTrigger>
         </TabsList>
 
@@ -284,6 +322,71 @@ export default async function CompanyDetailPage({
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Zichtbaarheid */}
+        <TabsContent value="visibility" className="mt-4">
+          <p className="mb-4 text-sm text-muted-foreground">
+            Bepaal welke rollen de producten van een categorie zien. Geen
+            selectie = zichtbaar voor iedereen.
+          </p>
+          {usedCategories.length === 0 ? (
+            <EmptyState
+              icon={Eye}
+              title="Nog geen categorieën in de catalogus"
+              description="Voeg producten met een categorie toe om zichtbaarheid in te stellen."
+            />
+          ) : roleList.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Dit bedrijf heeft nog geen rollen.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {usedCategories.map((c) => {
+                const set = allowedByCat.get(c.id) ?? new Set<string>();
+                const restricted = set.size > 0;
+                return (
+                  <Card key={c.id}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between text-base">
+                        {c.name}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {restricted
+                            ? `Zichtbaar voor ${set.size} rol(len)`
+                            : "Zichtbaar voor iedereen"}
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <form
+                        action={setCompanyCategoryVisibility.bind(null, id, c.id)}
+                        className="space-y-3"
+                      >
+                        <div className="flex flex-wrap gap-2">
+                          {roleList.map((r) => (
+                            <label
+                              key={r.id}
+                              className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand)]/5"
+                            >
+                              <input
+                                type="checkbox"
+                                name="role_ids"
+                                value={r.id}
+                                defaultChecked={set.has(r.id)}
+                                className="h-3.5 w-3.5"
+                              />
+                              {r.name}
+                            </label>
+                          ))}
+                        </div>
+                        <SubmitButton size="sm">Opslaan</SubmitButton>
+                      </form>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

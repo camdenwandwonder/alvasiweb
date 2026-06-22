@@ -40,6 +40,33 @@ export async function deleteCompany(id: string) {
   redirect("/admin/companies");
 }
 
+export async function setCompanyCategoryVisibility(
+  companyId: string,
+  categoryId: string,
+  formData: FormData,
+) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const roleIds = formData.getAll("role_ids").map(String).filter(Boolean);
+
+  await admin
+    .from("category_role_visibility")
+    .delete()
+    .eq("company_id", companyId)
+    .eq("category_id", categoryId);
+
+  if (roleIds.length) {
+    await admin.from("category_role_visibility").insert(
+      roleIds.map((rid) => ({
+        company_id: companyId,
+        category_id: categoryId,
+        role_id: rid,
+      })),
+    );
+  }
+  revalidatePath(`/admin/companies/${companyId}`);
+}
+
 function splitList(value: FormDataEntryValue | null): string[] {
   return String(value ?? "")
     .split(",")
