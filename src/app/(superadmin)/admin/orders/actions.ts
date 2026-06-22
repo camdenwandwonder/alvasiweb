@@ -74,6 +74,74 @@ export async function advanceOrderStatus(orderId: string, status: string) {
   revalidatePath("/admin/orders");
 }
 
+/**
+ * Move an order to a new status (used by the production board drag & drop and
+ * list view). Returns a result instead of throwing so the board can revert an
+ * optimistic move and show the reason (e.g. proof gating).
+ */
+export async function moveOrderStatus(
+  orderId: string,
+  status: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const user = await requireSuperadmin();
+    const admin = createAdminClient();
+
+    const { data: order } = await admin
+      .from("orders")
+      .select("id, company_id")
+      .eq("id", orderId)
+      .single();
+    if (!order) return { ok: false, error: "Bestelling niet gevonden" };
+
+    if (status === "in_production") {
+      const { data: items } = await admin
+        .from("order_items")
+        .select(
+          "product:products(requires_proof, category:categories(default_requires_proof))",
+        )
+        .eq("order_id", orderId);
+      const needsProof = (items ?? []).some((it) => {
+        const p = it.product as unknown as {
+          requires_proof: boolean | null;
+          category: { default_requires_proof: boolean } | null;
+        } | null;
+        return p?.requires_proof ?? p?.category?.default_requires_proof ?? false;
+      });
+      if (needsProof) {
+        const { count } = await admin
+          .from("proofs")
+          .select("*", { count: "exact", head: true })
+          .eq("order_id", orderId)
+          .eq("status", "approved");
+        if (!count)
+          return {
+            ok: false,
+            error: "Eerst een goedgekeurde proef vereist voor dit product.",
+          };
+      }
+    }
+
+    await admin.from("orders").update({ status }).eq("id", orderId);
+    await logEvent(admin, orderId, order.company_id, user.id, status, null);
+    revalidatePath("/admin/orders");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Mislukt" };
+  }
+}
+
+/** Toggle the personal production check-off on a single order line. */
+export async function toggleOrderItemChecked(
+  itemId: string,
+  checked: boolean,
+): Promise<{ ok: boolean }> {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  await admin.from("order_items").update({ checked }).eq("id", itemId);
+  return { ok: true };
+}
+
 export async function addProof(
   orderId: string,
   companyId: string,
