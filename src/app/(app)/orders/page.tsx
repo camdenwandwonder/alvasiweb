@@ -1,24 +1,20 @@
+import Link from "next/link";
 import { ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
 import { PageHeader, EmptyState, StatusBadge } from "@/components/primitives";
-import { SubmitButton } from "@/components/submit-button";
-import { formatDate, ORDER_STATUS } from "@/lib/format";
-import { approveOrder, rejectOrder } from "./actions";
+import { formatDate, formatPrice, ORDER_STATUS } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 type OrderRow = {
   id: string;
+  order_number: string | null;
   status: string;
-  note: string | null;
+  total: number;
   created_at: string;
   ordered_by: string;
-  items: {
-    quantity: number;
-    product_name: string;
-    variant_label: string | null;
-  }[];
+  items: { quantity: number; product_name: string }[];
 };
 
 export default async function OrdersPage() {
@@ -28,12 +24,11 @@ export default async function OrdersPage() {
   const { data } = await supabase
     .from("orders")
     .select(
-      "id, status, note, created_at, ordered_by, items:order_items(quantity, product_name, variant_label)",
+      "id, order_number, status, total, created_at, ordered_by, items:order_items(quantity, product_name)",
     )
     .order("created_at", { ascending: false });
 
   const orders = (data ?? []) as unknown as OrderRow[];
-  const canApprove = can(user, "orders.approve");
   const viewAll = can(user, "orders.view_all");
 
   const names = new Map<string, string>();
@@ -65,62 +60,38 @@ export default async function OrdersPage() {
           description="Bestellingen die je plaatst verschijnen hier."
         />
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {orders.map((o) => {
             const status = ORDER_STATUS[o.status] ?? {
               label: o.status,
               tone: "neutral" as const,
             };
+            const totalQty = o.items.reduce((s, i) => s + i.quantity, 0);
             return (
-              <li key={o.id} className="rounded-xl border bg-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-                    {viewAll ? (
-                      <span className="text-sm font-medium">
-                        {names.get(o.ordered_by) ?? "Teamlid"}
+              <li key={o.id}>
+                <Link
+                  href={`/orders/${o.id}`}
+                  className="flex items-center justify-between gap-3 rounded-xl border bg-card p-4 transition hover:border-foreground/20"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {o.order_number ?? "Bestelling"}
                       </span>
-                    ) : null}
-                    <time className="text-xs text-muted-foreground">
-                      {formatDate(o.created_at)}
-                    </time>
-                  </div>
-
-                  {canApprove && o.status === "pending_approval" ? (
-                    <div className="flex gap-2">
-                      <form action={approveOrder.bind(null, o.id)}>
-                        <SubmitButton size="sm">Goedkeuren</SubmitButton>
-                      </form>
-                      <form action={rejectOrder.bind(null, o.id)}>
-                        <SubmitButton size="sm" variant="destructive">
-                          Afwijzen
-                        </SubmitButton>
-                      </form>
+                      <StatusBadge tone={status.tone}>
+                        {status.label}
+                      </StatusBadge>
                     </div>
-                  ) : null}
-                </div>
-
-                <ul className="mt-3 space-y-1 text-sm">
-                  {o.items.map((i, idx) => (
-                    <li key={idx} className="flex justify-between">
-                      <span>
-                        {i.product_name}
-                        {i.variant_label ? (
-                          <span className="text-muted-foreground">
-                            {" "}
-                            · {i.variant_label}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="text-muted-foreground">×{i.quantity}</span>
-                    </li>
-                  ))}
-                </ul>
-                {o.note ? (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Notitie: {o.note}
-                  </p>
-                ) : null}
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                      {viewAll ? `${names.get(o.ordered_by) ?? "Teamlid"} · ` : ""}
+                      {totalQty} artikel{totalQty === 1 ? "" : "en"} ·{" "}
+                      {formatDate(o.created_at)}
+                    </p>
+                  </div>
+                  <span className="shrink-0 font-medium">
+                    {formatPrice(o.total)}
+                  </span>
+                </Link>
               </li>
             );
           })}

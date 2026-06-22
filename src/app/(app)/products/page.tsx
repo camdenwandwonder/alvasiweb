@@ -2,22 +2,23 @@ import { Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { PageHeader, EmptyState, Field, NativeSelect } from "@/components/primitives";
-import { SubmitButton } from "@/components/submit-button";
-import { variantLabel, formatPrice } from "@/lib/format";
-import { placeOrder } from "./actions";
+import { PageHeader, EmptyState } from "@/components/primitives";
+import { AddToCart } from "@/components/add-to-cart";
+import { formatPrice } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-type Variant = { id: string; attributes: Record<string, unknown> };
+type Variant = {
+  id: string;
+  attributes: Record<string, unknown>;
+  price_override: number | null;
+};
 type Image = { url: string; is_primary: boolean };
 type Product = {
   id: string;
   name: string;
   description: string | null;
   base_price: number | null;
-  max_quantity_per_order: number | null;
   category: { name: string } | null;
   variants: Variant[];
   images: Image[];
@@ -30,7 +31,7 @@ export default async function ProductsPage() {
   const { data } = await supabase
     .from("products")
     .select(
-      "id, name, description, base_price, max_quantity_per_order, category:categories(name), variants:product_variants(id, attributes), images:product_images(url, is_primary)",
+      "id, name, description, base_price, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
     )
     .eq("status", "active")
     .order("name");
@@ -91,36 +92,15 @@ export default async function ProductsPage() {
                   </div>
 
                   {canOrder ? (
-                    <form
-                      action={placeOrder.bind(null, p.id)}
-                      className="mt-4 space-y-3 border-t pt-4"
-                    >
-                      {p.variants.length > 0 ? (
-                        <Field label="Optie">
-                          <NativeSelect name="variant_id" required defaultValue="">
-                            <option value="" disabled>
-                              Kies…
-                            </option>
-                            {p.variants.map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {variantLabel(v.attributes)}
-                              </option>
-                            ))}
-                          </NativeSelect>
-                        </Field>
-                      ) : null}
-                      <Field label="Aantal">
-                        <Input
-                          name="quantity"
-                          type="number"
-                          min="1"
-                          max={p.max_quantity_per_order ?? undefined}
-                          defaultValue="1"
-                          required
-                        />
-                      </Field>
-                      <SubmitButton className="w-full">Bestellen</SubmitButton>
-                    </form>
+                    <div className="mt-4">
+                      <AddToCart
+                        productId={p.id}
+                        name={p.name}
+                        basePrice={p.base_price}
+                        image={img ?? null}
+                        variants={p.variants ?? []}
+                      />
+                    </div>
                   ) : null}
                 </div>
               </Card>

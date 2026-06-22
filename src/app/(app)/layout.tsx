@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, can } from "@/lib/auth/user";
 import { AppShell } from "@/components/app-shell";
+import { CartProvider } from "@/components/cart";
 import type { SidebarNavItem } from "@/components/app-sidebar";
 
 export const dynamic = "force-dynamic";
@@ -33,22 +34,26 @@ export default async function AppLayout({
   ];
   if (can(user, "products.view"))
     items.push({ href: "/products", label: "Winkel", icon: "shop" });
+  if (can(user, "orders.create"))
+    items.push({ href: "/cart", label: "Winkelwagen", icon: "cart" });
   if (can(user, "orders.view_own") || can(user, "orders.view_all"))
     items.push({ href: "/orders", label: "Bestellingen", icon: "orders" });
 
   return (
-    <AppShell
-      brandName={user.company.name}
-      subtitle="Bestelportaal"
-      logoUrl={user.company.logo_url}
-      primaryColor={user.company.primary_color}
-      secondaryColor={user.company.secondary_color}
-      items={items}
-      userName={user.fullName ?? ""}
-      userEmail={user.email ?? ""}
-      topbarTitle={user.company.name}
-    >
-      {children}
-    </AppShell>
+    <CartProvider companyId={user.company.id}>
+      <AppShell
+        brandName={user.company.name}
+        subtitle="Bestelportaal"
+        logoUrl={user.company.logo_url}
+        primaryColor={user.company.primary_color}
+        secondaryColor={user.company.secondary_color}
+        items={items}
+        userName={user.fullName ?? ""}
+        userEmail={user.email ?? ""}
+        topbarTitle={user.company.name}
+      >
+        {children}
+      </AppShell>
+    </CartProvider>
   );
 }
