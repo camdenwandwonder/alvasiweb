@@ -1,23 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, can } from "@/lib/auth/user";
+import { createAdminClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
+import { ImageUploader } from "@/components/image-uploader";
 import { formatDate, formatPrice, ORDER_STATUS } from "@/lib/format";
-import { approveOrder, rejectOrder, decideProof } from "../actions";
+import { advanceOrderStatus, addProof } from "../actions";
 
 export const dynamic = "force-dynamic";
-
-type Item = {
-  product_name: string;
-  variant_label: string | null;
-  quantity: number;
-  unit_price: number;
-  line_total: number;
-};
 
 const PROOF_STATUS: Record<
   string,
@@ -28,51 +20,74 @@ const PROOF_STATUS: Record<
   changes_requested: { label: "Wijziging gevraagd", tone: "red" },
 };
 
-export default async function OrderDetailPage({
+function nextActions(status: string): { label: string; to: string }[] {
+  switch (status) {
+    case "pending_approval":
+      return [
+        { label: "Goedkeuren", to: "approved" },
+        { label: "Afwijzen", to: "rejected" },
+      ];
+    case "approved":
+      return [{ label: "Naar productie", to: "in_production" }];
+    case "in_production":
+      return [{ label: "Markeer als verzonden", to: "shipped" }];
+    case "shipped":
+      return [{ label: "Markeer als geleverd", to: "delivered" }];
+    default:
+      return [];
+  }
+}
+
+export default async function AdminOrderDetail({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const user = await getCurrentUser();
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  const { data: order } = await supabase
+  const { data: order } = await admin
     .from("orders")
     .select(
-      "id, order_number, status, created_at, note, subtotal, total, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, items:order_items(product_name, variant_label, quantity, unit_price, line_total)",
+      "id, order_number, status, created_at, total, company_id, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, company:companies(name), items:order_items(product_name, variant_label, quantity, unit_price, line_total)",
     )
     .eq("id", id)
     .maybeSingle();
   if (!order) notFound();
 
   const [{ data: proofs }, { data: events }] = await Promise.all([
-    supabase
+    admin
       .from("proofs")
       .select("id, version, file_url, status, created_at")
       .eq("order_id", id)
       .order("version", { ascending: false }),
-    supabase
+    admin
       .from("order_events")
       .select("id, status, note, created_at")
       .eq("order_id", id)
       .order("created_at", { ascending: false }),
   ]);
 
-  const items = (order.items ?? []) as unknown as Item[];
   const status = ORDER_STATUS[order.status] ?? {
     label: order.status,
     tone: "neutral" as const,
   };
-  const canApprove = can(user, "orders.approve");
+  const actions = nextActions(order.status);
+  const items = (order.items ?? []) as unknown as {
+    product_name: string;
+    variant_label: string | null;
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+  }[];
 
   return (
     <div className="max-w-3xl">
       <Link
-        href="/orders"
+        href="/admin/orders"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Bestellingen
+        <ArrowLeft className="h-4 w-4" /> Productie
       </Link>
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -81,23 +96,22 @@ export default async function OrderDetailPage({
             {order.order_number ?? "Bestelling"}
           </h1>
           <p className="text-sm text-muted-foreground">
+            {(order.company as unknown as { name: string } | null)?.name} ·{" "}
             {formatDate(order.created_at)}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-          {canApprove && order.status === "pending_approval" ? (
-            <>
-              <form action={approveOrder.bind(null, order.id)}>
-                <SubmitButton size="sm">Goedkeuren</SubmitButton>
-              </form>
-              <form action={rejectOrder.bind(null, order.id)}>
-                <SubmitButton size="sm" variant="destructive">
-                  Afwijzen
-                </SubmitButton>
-              </form>
-            </>
-          ) : null}
+          {actions.map((a) => (
+            <form key={a.to} action={advanceOrderStatus.bind(null, id, a.to)}>
+              <SubmitButton
+                size="sm"
+                variant={a.to === "rejected" ? "destructive" : "default"}
+              >
+                {a.label}
+              </SubmitButton>
+            </form>
+          ))}
         </div>
       </div>
 
@@ -132,45 +146,29 @@ export default async function OrderDetailPage({
               {formatPrice(order.total)}
             </span>
           </div>
+          {order.ship_to_name || order.ship_to_address ? (
+            <div className="mt-4 border-t pt-3 text-sm text-muted-foreground">
+              <p className="mb-1 font-medium text-foreground">Leveradres</p>
+              {order.ship_to_name ? <p>{order.ship_to_name}</p> : null}
+              {order.ship_to_address ? <p>{order.ship_to_address}</p> : null}
+              <p>
+                {[order.ship_to_postal, order.ship_to_city]
+                  .filter(Boolean)
+                  .join(" ")}
+              </p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      {order.ship_to_name || order.ship_to_address ? (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">Leveradres</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {order.ship_to_name ? <p>{order.ship_to_name}</p> : null}
-            {order.ship_to_address ? <p>{order.ship_to_address}</p> : null}
-            <p>
-              {[order.ship_to_postal, order.ship_to_city]
-                .filter(Boolean)
-                .join(" ")}
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {order.note ? (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">Notitie</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {order.note}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Proeven */}
-      {proofs && proofs.length > 0 ? (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">Proeven ter goedkeuring</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
+      {/* Proofs */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Proeven</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {proofs && proofs.length > 0 ? (
+            <ul className="mb-4 space-y-2">
               {proofs.map((p) => {
                 const ps = PROOF_STATUS[p.status] ?? {
                   label: p.status,
@@ -179,7 +177,7 @@ export default async function OrderDetailPage({
                 return (
                   <li
                     key={p.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                    className="flex items-center justify-between rounded-lg border p-3"
                   >
                     <div className="flex items-center gap-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -200,42 +198,37 @@ export default async function OrderDetailPage({
                         </a>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <StatusBadge tone={ps.tone}>{ps.label}</StatusBadge>
-                      {p.status === "pending" ? (
-                        <>
-                          <form action={decideProof.bind(null, p.id, "approved")}>
-                            <SubmitButton size="sm">Goedkeuren</SubmitButton>
-                          </form>
-                          <form
-                            action={decideProof.bind(
-                              null,
-                              p.id,
-                              "changes_requested",
-                            )}
-                          >
-                            <SubmitButton size="sm" variant="outline">
-                              Wijziging vragen
-                            </SubmitButton>
-                          </form>
-                        </>
-                      ) : null}
-                    </div>
+                    <StatusBadge tone={ps.tone}>{ps.label}</StatusBadge>
                   </li>
                 );
               })}
             </ul>
-          </CardContent>
-        </Card>
-      ) : null}
+          ) : (
+            <p className="mb-4 text-sm text-muted-foreground">
+              Nog geen proeven geüpload.
+            </p>
+          )}
+          <form
+            action={addProof.bind(null, id, order.company_id)}
+            className="space-y-3"
+          >
+            <ImageUploader name="file_url" bucket="proofs" />
+            <SubmitButton variant="outline" size="sm">
+              Proef toevoegen
+            </SubmitButton>
+          </form>
+        </CardContent>
+      </Card>
 
-      {/* Tijdlijn */}
-      {events && events.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Tijdlijn</CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Timeline */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Tijdlijn</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!events || events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nog geen gebeurtenissen.</p>
+          ) : (
             <ul className="space-y-3">
               {events.map((e) => (
                 <li key={e.id} className="flex gap-3 text-sm">
@@ -253,9 +246,9 @@ export default async function OrderDetailPage({
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
-      ) : null}
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
