@@ -38,6 +38,14 @@ export default async function AppLayout({
     items.push({ href: "/cart", label: "Winkelwagen", icon: "cart" });
   if (can(user, "orders.view_own") || can(user, "orders.view_all"))
     items.push({ href: "/orders", label: "Bestellingen", icon: "orders" });
+  if (can(user, "orders.approve"))
+    items.push({ href: "/approvals", label: "Goedkeuringen", icon: "approvals" });
+  if (can(user, "users.view"))
+    items.push({ href: "/people", label: "Personeel", icon: "people" });
+  if (can(user, "roles.manage"))
+    items.push({ href: "/roles", label: "Rollen", icon: "roles" });
+  if (can(user, "settings.manage"))
+    items.push({ href: "/budgets", label: "Regels & budget", icon: "rules" });
 
   return (
     <CartProvider companyId={user.company.id}>
