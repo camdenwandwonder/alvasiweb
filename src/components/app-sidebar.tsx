@@ -30,10 +30,12 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useCartCount } from "@/components/cart";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
@@ -74,6 +76,7 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const cartCount = useCartCount();
 
   async function signOut() {
     await createClient().auth.signOut();
@@ -124,6 +127,8 @@ export function AppSidebar({
                 const active =
                   pathname === item.href ||
                   (item.href !== "/" && pathname.startsWith(`${item.href}/`));
+                const showCart =
+                  item.icon === "cart" && !!cartCount && cartCount > 0;
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -135,6 +140,11 @@ export function AppSidebar({
                       <Icon className="h-4 w-4" />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
+                    {showCart ? (
+                      <SidebarMenuBadge className="bg-[var(--brand)] text-[var(--brand-foreground)] peer-data-active/menu-button:bg-[var(--brand-foreground)] peer-data-active/menu-button:text-[var(--brand)]">
+                        {cartCount > 99 ? "99+" : cartCount}
+                      </SidebarMenuBadge>
+                    ) : null}
                   </SidebarMenuItem>
                 );
               })}

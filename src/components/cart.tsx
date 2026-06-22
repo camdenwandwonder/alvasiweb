@@ -101,3 +101,9 @@ export function useCart() {
   if (!ctx) throw new Error("useCart moet binnen CartProvider gebruikt worden");
   return ctx;
 }
+
+/** Cart item count, or null when used outside a CartProvider (e.g. admin). */
+export function useCartCount(): number | null {
+  const ctx = useContext(Ctx);
+  return ctx ? ctx.count : null;
+}
