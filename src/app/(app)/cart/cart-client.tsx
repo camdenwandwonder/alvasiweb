@@ -87,6 +87,7 @@ export function CartClient({ addresses }: { addresses: DeliveryAddress[] }) {
         cart.items.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
+          variantLabel: i.variantLabel,
           qty: i.qty,
         })),
         {

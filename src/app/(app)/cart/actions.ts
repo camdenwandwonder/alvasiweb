@@ -9,6 +9,7 @@ import { sendEmail } from "@/lib/email";
 export type CheckoutItem = {
   productId: string;
   variantId: string | null;
+  variantLabel?: string | null;
   qty: number;
 };
 
@@ -115,15 +116,19 @@ export async function createOrderFromCart(
 
     let unitPrice = Number(product.base_price ?? 0);
     const creditCost = Number(product.credit_cost ?? 0);
-    let label: string | null = null;
+    let label: string | null = item.variantLabel?.trim() || null;
     let sku: string | null = product.sku;
+    // Only keep variant_id if the variant still exists (carts in localStorage
+    // can hold stale ids after the catalog/options are re-generated).
+    let resolvedVariantId: string | null = null;
     if (item.variantId) {
       const { data: variant } = await supabase
         .from("product_variants")
-        .select("attributes, sku, price_override")
+        .select("id, attributes, sku, price_override")
         .eq("id", item.variantId)
-        .single();
+        .maybeSingle();
       if (variant) {
+        resolvedVariantId = variant.id;
         label = variantLabel(variant.attributes as Record<string, unknown>);
         sku = variant.sku ?? sku;
         if (variant.price_override != null) unitPrice = Number(variant.price_override);
@@ -136,7 +141,7 @@ export async function createOrderFromCart(
     qtyByProduct[product.id] = (qtyByProduct[product.id] ?? 0) + qty;
     lines.push({
       product_id: product.id,
-      variant_id: item.variantId,
+      variant_id: resolvedVariantId,
       product_name: product.name,
       variant_label: label,
       sku,
