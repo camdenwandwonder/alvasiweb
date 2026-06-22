@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Palette,
   Eye,
+  Wallet,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,8 @@ import { CompanyBrandingForm } from "@/components/company-branding-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BrandPreview } from "@/components/brand-preview";
 import { ProductThumb } from "@/components/product-thumb";
+import { BudgetSettingsPanel } from "@/components/budget-settings-panel";
+import type { BudgetMode } from "@/lib/allowance";
 import { formatPrice } from "@/lib/format";
 import {
   createCompanyUser,
@@ -53,35 +56,51 @@ export default async function CompanyDetailPage({
 
   const { data: company } = await admin
     .from("companies")
-    .select("id, name, slug, logo_url, primary_color, secondary_color")
+    .select("id, name, slug, logo_url, primary_color, secondary_color, settings")
     .eq("id", id)
     .maybeSingle();
   if (!company) notFound();
 
-  const [{ data: products }, { data: roles }, { data: users }, { data: crv }] =
-    await Promise.all([
-      admin
-        .from("products")
-        .select(
-          "id, name, status, base_price, category:categories(id, name), images:product_images(url, is_primary)",
-        )
-        .eq("company_id", id)
-        .order("created_at", { ascending: false }),
-      admin
-        .from("roles")
-        .select("id, name, requires_order_approval")
-        .eq("company_id", id)
-        .order("name"),
-      admin
-        .from("profiles")
-        .select("id, full_name, email, status, role:roles(name)")
-        .eq("company_id", id)
-        .order("created_at", { ascending: false }),
-      admin
-        .from("category_role_visibility")
-        .select("category_id, role_id")
-        .eq("company_id", id),
-    ]);
+  const [
+    { data: products },
+    { data: roles },
+    { data: users },
+    { data: crv },
+    { data: budgets },
+    { data: allotments },
+  ] = await Promise.all([
+    admin
+      .from("products")
+      .select(
+        "id, name, status, base_price, category:categories(id, name), images:product_images(url, is_primary)",
+      )
+      .eq("company_id", id)
+      .order("created_at", { ascending: false }),
+    admin
+      .from("roles")
+      .select("id, name, requires_order_approval")
+      .eq("company_id", id)
+      .order("name"),
+    admin
+      .from("profiles")
+      .select("id, full_name, email, status, role:roles(name)")
+      .eq("company_id", id)
+      .order("created_at", { ascending: false }),
+    admin
+      .from("category_role_visibility")
+      .select("category_id, role_id")
+      .eq("company_id", id),
+    admin
+      .from("budgets")
+      .select("id, scope, target_id, amount, period, kind")
+      .eq("company_id", id)
+      .order("created_at", { ascending: false }),
+    admin
+      .from("product_allotments")
+      .select("id, scope, target_id, product_id, max_quantity, period")
+      .eq("company_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const productList = products ?? [];
   const userList = users ?? [];
@@ -103,6 +122,10 @@ export default async function CompanyDetailPage({
     s.add(r.role_id);
     allowedByCat.set(r.category_id, s);
   }
+
+  const settings = (company.settings as Record<string, unknown>) ?? {};
+  const budgetMode = (settings.budget_mode as BudgetMode) ?? "euro";
+  const threshold = settings.approval_over_amount;
 
   return (
     <div>
@@ -131,6 +154,9 @@ export default async function CompanyDetailPage({
           </TabsTrigger>
           <TabsTrigger value="visibility">
             <Eye className="h-4 w-4" /> Zichtbaarheid
+          </TabsTrigger>
+          <TabsTrigger value="budget">
+            <Wallet className="h-4 w-4" /> Bestelwijze
           </TabsTrigger>
         </TabsList>
 
@@ -385,6 +411,24 @@ export default async function CompanyDetailPage({
               })}
             </div>
           )}
+        </TabsContent>
+
+        {/* Bestelwijze */}
+        <TabsContent value="budget" className="mt-4">
+          <BudgetSettingsPanel
+            companyId={id}
+            mode={budgetMode}
+            approvalThreshold={threshold != null ? String(threshold) : ""}
+            roles={roleList.map((r) => ({ id: r.id, name: r.name }))}
+            people={userList.map((u) => ({
+              id: u.id,
+              full_name: u.full_name,
+              email: u.email,
+            }))}
+            products={productList.map((p) => ({ id: p.id, name: p.name }))}
+            budgets={(budgets ?? []) as never}
+            allotments={(allotments ?? []) as never}
+          />
         </TabsContent>
       </Tabs>
     </div>

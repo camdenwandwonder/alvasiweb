@@ -135,6 +135,7 @@ export default async function ProductEditorPage({
           status: product.status,
           description: product.description,
           base_price: product.base_price,
+          credit_cost: product.credit_cost,
           max_quantity_per_order: product.max_quantity_per_order,
         }}
         categories={categories ?? []}

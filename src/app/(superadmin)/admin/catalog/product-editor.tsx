@@ -28,6 +28,7 @@ type Product = {
   status: string;
   description: string | null;
   base_price: number | null;
+  credit_cost: number | null;
   max_quantity_per_order: number | null;
 };
 
@@ -49,6 +50,9 @@ export function ProductEditor({
   const [price, setPrice] = useState(
     product.base_price != null ? String(product.base_price) : "",
   );
+  const [creditCost, setCreditCost] = useState(
+    product.credit_cost != null ? String(product.credit_cost) : "",
+  );
   const [maxQty, setMaxQty] = useState(
     product.max_quantity_per_order != null
       ? String(product.max_quantity_per_order)
@@ -68,6 +72,7 @@ export function ProductEditor({
       status,
       description: description || null,
       base_price: price.trim() ? Number(price) : null,
+      credit_cost: creditCost.trim() ? Number(creditCost) : null,
       max_quantity_per_order: maxQty.trim() ? Number(maxQty) : null,
       regenVariants,
       selections,
@@ -91,7 +96,7 @@ export function ProductEditor({
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, status, description, price, maxQty, selections]);
+  }, [name, status, description, price, creditCost, maxQty, selections]);
 
   // Warn if leaving with a save still pending.
   useEffect(() => {
@@ -225,7 +230,7 @@ export function ProductEditor({
               }}
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Prijs (€)">
               <Input
                 type="number"
@@ -239,7 +244,20 @@ export function ProductEditor({
                 placeholder="0,00"
               />
             </Field>
-            <Field label="Max. aantal / bestelling" hint="Leeg = categoriestandaard">
+            <Field label="Credits" hint="Voor credits-modus">
+              <Input
+                type="number"
+                step="1"
+                min="0"
+                value={creditCost}
+                onChange={(e) => {
+                  setCreditCost(e.target.value);
+                  touch();
+                }}
+                placeholder="0"
+              />
+            </Field>
+            <Field label="Max. / bestelling" hint="Leeg = standaard">
               <Input
                 type="number"
                 min="1"

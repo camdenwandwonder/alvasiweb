@@ -20,6 +20,7 @@ type Raw = {
   name: string;
   description: string | null;
   base_price: number | null;
+  credit_cost: number | null;
   category_id: string | null;
   category: { name: string } | null;
   variants: ShopProduct["variants"];
@@ -34,7 +35,7 @@ export default async function ProductsPage() {
     supabase
       .from("products")
       .select(
-        "id, name, description, base_price, category_id, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
+        "id, name, description, base_price, credit_cost, category_id, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
       )
       .eq("status", "active")
       .order("name"),
@@ -68,6 +69,7 @@ export default async function ProductsPage() {
     name: p.name,
     description: p.description,
     base_price: p.base_price,
+    credit_cost: p.credit_cost,
     category_id: p.category_id,
     category_name: p.category?.name ?? null,
     variants: p.variants ?? [],
@@ -91,19 +93,26 @@ export default async function ProductsPage() {
         description="Blader door en bestel de producten van jouw bedrijf."
       />
 
-      {allowance.hasLimit && allowance.mode === "euro" ? (
+      {allowance.hasLimit &&
+      (allowance.mode === "euro" || allowance.mode === "credits") ? (
         <div className="mb-6 rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2 text-sm font-medium">
-              <Wallet className="h-4 w-4 text-[var(--brand)]" /> Resterend budget
+              <Wallet className="h-4 w-4 text-[var(--brand)]" /> Resterend{" "}
+              {allowance.mode === "credits" ? "credits" : "budget"}
               {allowance.period ? ` (${PERIOD[allowance.period]})` : ""}
             </span>
             <span className="text-sm">
               <span className="font-semibold">
-                {formatPrice(allowance.remaining)}
+                {allowance.mode === "credits"
+                  ? `${allowance.remaining} credits`
+                  : formatPrice(allowance.remaining)}
               </span>{" "}
               <span className="text-muted-foreground">
-                van {formatPrice(allowance.total)}
+                van{" "}
+                {allowance.mode === "credits"
+                  ? `${allowance.total} credits`
+                  : formatPrice(allowance.total)}
               </span>
             </span>
           </div>
@@ -116,10 +125,20 @@ export default async function ProductsPage() {
         </div>
       ) : null}
 
+      {allowance.mode === "quantity" && allowance.hasLimit ? (
+        <div className="mb-6 flex items-center gap-2 rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+          <Wallet className="h-4 w-4 text-[var(--brand)]" /> Je hebt een vast
+          aantal per product. Het resterende aantal staat per product
+          aangegeven.
+        </div>
+      ) : null}
+
       <ShopGrid
         products={products}
         categories={categories}
         canOrder={can(user, "orders.create")}
+        mode={allowance.mode}
+        perProduct={allowance.perProduct}
       />
     </div>
   );

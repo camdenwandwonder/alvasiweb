@@ -8,6 +8,7 @@ import { NativeSelect } from "@/components/primitives";
 import { ProductThumb } from "@/components/product-thumb";
 import { AddToCart } from "@/components/add-to-cart";
 import { formatPrice } from "@/lib/format";
+import type { BudgetMode } from "@/lib/allowance";
 
 export type ShopVariant = {
   id: string;
@@ -19,6 +20,7 @@ export type ShopProduct = {
   name: string;
   description: string | null;
   base_price: number | null;
+  credit_cost: number | null;
   category_id: string | null;
   category_name: string | null;
   variants: ShopVariant[];
@@ -29,11 +31,36 @@ export function ShopGrid({
   products,
   categories,
   canOrder,
+  mode = "euro",
+  perProduct,
 }: {
   products: ShopProduct[];
   categories: { id: string; name: string }[];
   canOrder: boolean;
+  mode?: BudgetMode;
+  perProduct?: Record<string, { max: number; used: number; remaining: number }>;
 }) {
+  function priceLabel(p: ShopProduct): React.ReactNode {
+    if (mode === "credits")
+      return (
+        <span className="text-sm font-medium">
+          {p.credit_cost ?? 0} credits
+        </span>
+      );
+    if (mode === "quantity") {
+      const q = perProduct?.[p.id];
+      if (!q) return <span className="text-xs text-muted-foreground">—</span>;
+      return (
+        <span className="text-xs font-medium">
+          {q.remaining}/{q.max} over
+        </span>
+      );
+    }
+    return (
+      <span className="text-sm font-medium">{formatPrice(p.base_price)}</span>
+    );
+  }
+
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [sort, setSort] = useState<"name" | "price-asc" | "price-desc">("name");
@@ -50,12 +77,12 @@ export function ShopGrid({
     if (categoryId) list = list.filter((p) => p.category_id === categoryId);
     list = [...list].sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name);
-      const av = a.base_price ?? 0;
-      const bv = b.base_price ?? 0;
-      return sort === "price-asc" ? av - bv : bv - av;
+      const val = (p: ShopProduct) =>
+        mode === "credits" ? (p.credit_cost ?? 0) : (p.base_price ?? 0);
+      return sort === "price-asc" ? val(a) - val(b) : val(b) - val(a);
     });
     return list;
-  }, [products, query, categoryId, sort]);
+  }, [products, query, categoryId, sort, mode]);
 
   return (
     <div>
@@ -115,9 +142,7 @@ export function ShopGrid({
                 <div className="flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-medium">{p.name}</h3>
-                    <span className="shrink-0 text-sm font-medium">
-                      {formatPrice(p.base_price)}
-                    </span>
+                    <span className="shrink-0">{priceLabel(p)}</span>
                   </div>
                   {p.category_name ? (
                     <p className="text-xs text-muted-foreground">
