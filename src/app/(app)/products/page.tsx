@@ -19,6 +19,7 @@ type Product = {
   name: string;
   description: string | null;
   base_price: number | null;
+  category_id: string | null;
   category: { name: string } | null;
   variants: Variant[];
   images: Image[];
@@ -31,13 +32,34 @@ export default async function ProductsPage() {
   const { data } = await supabase
     .from("products")
     .select(
-      "id, name, description, base_price, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
+      "id, name, description, base_price, category_id, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
     )
     .eq("status", "active")
     .order("name");
 
-  const products = (data ?? []) as unknown as Product[];
+  let products = (data ?? []) as unknown as Product[];
   const canOrder = can(user, "orders.create");
+
+  // Role-based catalog visibility: members only see categories allowed for their
+  // role. Managers (orders.view_all) and superadmin see everything.
+  if (user?.companyId && !can(user, "orders.view_all")) {
+    const { data: rules } = await supabase
+      .from("category_role_visibility")
+      .select("category_id, role_id")
+      .eq("company_id", user.companyId);
+    const allowed = new Map<string, Set<string>>();
+    for (const r of rules ?? []) {
+      const s = allowed.get(r.category_id) ?? new Set<string>();
+      s.add(r.role_id);
+      allowed.set(r.category_id, s);
+    }
+    products = products.filter((p) => {
+      if (!p.category_id) return true;
+      const set = allowed.get(p.category_id);
+      if (!set) return true; // unrestricted category
+      return user.roleId ? set.has(user.roleId) : false;
+    });
+  }
 
   return (
     <div>

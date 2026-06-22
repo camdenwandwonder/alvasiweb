@@ -18,6 +18,7 @@ import {
   CheckSquare,
   SlidersHorizontal,
   BarChart3,
+  Eye,
   LogOut,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -46,6 +47,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   profile: User,
   roles: Shield,
   rules: SlidersHorizontal,
+  visibility: Eye,
   reports: BarChart3,
   production: Boxes,
   settings: Settings,

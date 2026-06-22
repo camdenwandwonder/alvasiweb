@@ -47,6 +47,8 @@ export default async function AppLayout({
   if (can(user, "settings.manage"))
     items.push({ href: "/budgets", label: "Regels & budget", icon: "rules" });
   if (can(user, "settings.manage"))
+    items.push({ href: "/visibility", label: "Zichtbaarheid", icon: "visibility" });
+  if (can(user, "settings.manage"))
     items.push({ href: "/settings", label: "Instellingen", icon: "settings" });
   items.push({ href: "/profile", label: "Mijn profiel", icon: "profile" });
 
