@@ -31,9 +31,21 @@ export function AppShell({
   accountHref: string;
   children: React.ReactNode;
 }) {
+  const brand = primaryColor ?? "#0f172a";
+  const brand2 = secondaryColor ?? "#6366f1";
+  // Map the company's brand color onto the design-system tokens so that every
+  // `bg-primary`, focus ring and sidebar accent across the member/manager
+  // portal visibly adopts the company's colors (not just a few accents).
   const style = {
-    "--brand": primaryColor ?? "#0f172a",
-    "--brand-2": secondaryColor ?? "#6366f1",
+    "--brand": brand,
+    "--brand-2": brand2,
+    "--primary": brand,
+    "--primary-foreground": "var(--brand-foreground)",
+    "--ring": brand,
+    "--sidebar-primary": brand,
+    "--sidebar-ring": brand,
+    "--accent": "color-mix(in oklch, var(--brand) 10%, var(--background))",
+    "--accent-foreground": brand,
   } as React.CSSProperties;
 
   return (
