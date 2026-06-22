@@ -35,14 +35,19 @@ export type Delivery = {
  * allowance (euro/credits/quantity), it is flagged as a request (is_request +
  * reason) and the DB trigger routes it to approval.
  */
+export type CheckoutResult =
+  | { ok: true; orderId: string; isRequest: boolean }
+  | { ok: false; error: string; code?: "reason_required" };
+
 export async function createOrderFromCart(
   items: CheckoutItem[],
   delivery: Delivery,
   options?: { reason?: string },
-): Promise<{ orderId: string; isRequest: boolean }> {
+): Promise<CheckoutResult> {
   const user = await getCurrentUser();
-  if (!user || !user.companyId) throw new Error("Geen toegang");
-  if (!items.length) throw new Error("Je winkelwagen is leeg");
+  if (!user || !user.companyId) return { ok: false, error: "Geen toegang" };
+  if (!items.length)
+    return { ok: false, error: "Je winkelwagen is leeg" };
 
   const supabase = await createClient();
 
@@ -60,7 +65,7 @@ export async function createOrderFromCart(
       .eq("id", delivery.addressId)
       .eq("company_id", user.companyId)
       .single();
-    if (!addr) throw new Error("Gekozen leveradres niet gevonden");
+    if (!addr) return { ok: false, error: "Gekozen leveradres niet gevonden" };
     shipTo = {
       name: addr.recipient ?? addr.label,
       address: addr.street ?? undefined,
@@ -99,11 +104,13 @@ export async function createOrderFromCart(
       .select("id, name, sku, base_price, credit_cost, max_quantity_per_order")
       .eq("id", item.productId)
       .single();
-    if (error || !product) throw new Error("Product niet gevonden");
+    if (error || !product)
+      return { ok: false, error: "Product niet gevonden" };
     if (product.max_quantity_per_order && qty > product.max_quantity_per_order) {
-      throw new Error(
-        `Maximaal ${product.max_quantity_per_order} per bestelling voor ${product.name}`,
-      );
+      return {
+        ok: false,
+        error: `Maximaal ${product.max_quantity_per_order} per bestelling voor ${product.name}`,
+      };
     }
 
     let unitPrice = Number(product.base_price ?? 0);
@@ -159,7 +166,11 @@ export async function createOrderFromCart(
   const userReason = options?.reason?.trim() || null;
   // Over-allowance still requires a written reason from the member.
   if (isOver && !userReason)
-    throw new Error("Geef een reden op voor je aanvraag.");
+    return {
+      ok: false,
+      code: "reason_required",
+      error: "Geef een reden op voor je aanvraag.",
+    };
 
   // A custom delivery address always routes to approval (auto reason).
   const reasonParts: string[] = [];
@@ -196,12 +207,14 @@ export async function createOrderFromCart(
     })
     .select("id, order_number")
     .single();
-  if (oErr) throw new Error(oErr.message);
+  if (oErr || !order)
+    return { ok: false, error: `Bestelling mislukt: ${oErr?.message ?? "onbekend"}` };
 
   const { error: iErr } = await supabase.from("order_items").insert(
     lines.map((l) => ({ order_id: order.id, company_id: user.companyId, ...l })),
   );
-  if (iErr) throw new Error(iErr.message);
+  if (iErr)
+    return { ok: false, error: `Bestelregels mislukt: ${iErr.message}` };
 
   const notifyTo = process.env.ALVASI_NOTIFY_EMAIL;
   if (notifyTo) {
@@ -224,5 +237,5 @@ export async function createOrderFromCart(
     });
   }
 
-  return { orderId: order.id, isRequest };
+  return { ok: true, orderId: order.id, isRequest };
 }

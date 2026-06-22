@@ -83,7 +83,7 @@ export function CartClient({ addresses }: { addresses: DeliveryAddress[] }) {
     }
     setSubmitting(true);
     try {
-      const { orderId, isRequest } = await createOrderFromCart(
+      const res = await createOrderFromCart(
         cart.items.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
@@ -96,19 +96,25 @@ export function CartClient({ addresses }: { addresses: DeliveryAddress[] }) {
         },
         { reason: reason.trim() || undefined },
       );
-      cart.clear();
-      toast.success(isRequest ? "Aanvraag ingediend" : "Bestelling geplaatst");
-      router.push(`/orders/${orderId}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Er ging iets mis";
-      if (msg.toLowerCase().includes("reden")) {
-        setRequireReason(true);
-        toast.warning(
-          "Je budget/limiet is bereikt. Geef een reden op om dit aan te vragen.",
-        );
-      } else {
-        toast.error(msg);
+      if (!res.ok) {
+        if (res.code === "reason_required") {
+          setRequireReason(true);
+          toast.warning(
+            "Je budget/limiet is bereikt. Geef een reden op om dit aan te vragen.",
+          );
+        } else {
+          toast.error(res.error);
+        }
+        setSubmitting(false);
+        return;
       }
+      cart.clear();
+      toast.success(
+        res.isRequest ? "Aanvraag ingediend" : "Bestelling geplaatst",
+      );
+      router.push(`/orders/${res.orderId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Er ging iets mis");
       setSubmitting(false);
     }
   }
