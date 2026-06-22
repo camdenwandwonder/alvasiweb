@@ -8,7 +8,7 @@ import { slugify } from "@/lib/format";
 
 async function requireSuperadmin() {
   const user = await getCurrentUser();
-  if (!user?.isSuperadmin) throw new Error("Not authorized");
+  if (!user?.isSuperadmin) throw new Error("Geen toegang");
 }
 
 function num(v: FormDataEntryValue | null): number | null {
@@ -24,7 +24,7 @@ export async function createCategory(formData: FormData) {
   await requireSuperadmin();
   const admin = createAdminClient();
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Name is required");
+  if (!name) throw new Error("Naam is verplicht");
 
   const { data, error } = await admin
     .from("categories")
@@ -32,10 +32,6 @@ export async function createCategory(formData: FormData) {
       name,
       slug: `${slugify(name) || "category"}-${crypto.randomUUID().slice(0, 4)}`,
       description: String(formData.get("description") ?? "").trim() || null,
-      default_requires_approval: formData.get("default_requires_approval") === "on",
-      default_requires_proof: formData.get("default_requires_proof") === "on",
-      default_max_quantity: num(formData.get("default_max_quantity")),
-      default_lead_time_days: num(formData.get("default_lead_time_days")),
     })
     .select("id")
     .single();
@@ -63,23 +59,6 @@ export async function updateCategory(id: string, formData: FormData) {
     .eq("id", id);
   if (error) throw new Error(error.message);
 
-  // Replace the set of applicable option axes.
-  const selected = formData.getAll("option_set_ids").map(String);
-  await admin.from("category_option_sets").delete().eq("category_id", id);
-  if (selected.length) {
-    const { data: sets } = await admin
-      .from("option_sets")
-      .select("id, kind")
-      .in("id", selected);
-    const rows = (sets ?? []).map((s, i) => ({
-      category_id: id,
-      option_set_id: s.id,
-      axis_role: s.kind === "color" ? "color" : s.kind === "size" ? "size" : "option",
-      sort_order: i + 1,
-    }));
-    if (rows.length) await admin.from("category_option_sets").insert(rows);
-  }
-
   revalidatePath(`/admin/config/categories/${id}`);
   revalidatePath("/admin/config/categories");
 }
@@ -93,65 +72,74 @@ export async function deleteCategory(id: string) {
   redirect("/admin/config/categories");
 }
 
-/* ----------------------------- Option sets ----------------------------- */
+/* ------------------ Option axes (lived inside a category) ------------------ */
 
-export async function createOptionSet(formData: FormData) {
+export async function addAxis(categoryId: string, formData: FormData) {
   await requireSuperadmin();
   const admin = createAdminClient();
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Name is required");
-  const kind = String(formData.get("kind") ?? "size");
+  const kindRaw = String(formData.get("kind") ?? "size");
+  const kind = ["size", "color", "text"].includes(kindRaw) ? kindRaw : "size";
+  if (!name) throw new Error("Naam is verplicht");
 
-  const { data, error } = await admin
+  const { data: set, error } = await admin
     .from("option_sets")
-    .insert({
-      name,
-      kind: ["size", "color", "text"].includes(kind) ? kind : "size",
-      description: String(formData.get("description") ?? "").trim() || null,
-    })
+    .insert({ name, kind })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/config/options");
-  redirect(`/admin/config/options/${data.id}`);
+  const { count } = await admin
+    .from("category_option_sets")
+    .select("*", { count: "exact", head: true })
+    .eq("category_id", categoryId);
+
+  await admin.from("category_option_sets").insert({
+    category_id: categoryId,
+    option_set_id: set.id,
+    axis_role: kind === "color" ? "color" : kind === "size" ? "size" : "option",
+    sort_order: (count ?? 0) + 1,
+  });
+
+  revalidatePath(`/admin/config/categories/${categoryId}`);
 }
 
-export async function deleteOptionSet(id: string) {
+export async function removeAxis(categoryId: string, optionSetId: string) {
   await requireSuperadmin();
   const admin = createAdminClient();
-  const { error } = await admin.from("option_sets").delete().eq("id", id);
-  if (error) throw new Error(error.message);
-  revalidatePath("/admin/config/options");
-  redirect("/admin/config/options");
+  // Deleting the option set also removes its link + values (cascade).
+  await admin.from("option_sets").delete().eq("id", optionSetId);
+  revalidatePath(`/admin/config/categories/${categoryId}`);
 }
 
-export async function addOptionValue(optionSetId: string, formData: FormData) {
+export async function addAxisValue(
+  categoryId: string,
+  optionSetId: string,
+  formData: FormData,
+) {
   await requireSuperadmin();
   const admin = createAdminClient();
   const value = String(formData.get("value") ?? "").trim();
-  if (!value) throw new Error("Value is required");
+  if (!value) throw new Error("Waarde is verplicht");
 
   const { count } = await admin
     .from("option_values")
     .select("*", { count: "exact", head: true })
     .eq("option_set_id", optionSetId);
 
-  const { error } = await admin.from("option_values").insert({
+  await admin.from("option_values").insert({
     option_set_id: optionSetId,
     value,
     label: String(formData.get("label") ?? "").trim() || value,
     swatch: String(formData.get("swatch") ?? "").trim() || null,
     sort_order: (count ?? 0) + 1,
   });
-  if (error) throw new Error(error.message);
-  revalidatePath(`/admin/config/options/${optionSetId}`);
+  revalidatePath(`/admin/config/categories/${categoryId}`);
 }
 
-export async function deleteOptionValue(id: string, optionSetId: string) {
+export async function removeAxisValue(categoryId: string, valueId: string) {
   await requireSuperadmin();
   const admin = createAdminClient();
-  const { error } = await admin.from("option_values").delete().eq("id", id);
-  if (error) throw new Error(error.message);
-  revalidatePath(`/admin/config/options/${optionSetId}`);
+  await admin.from("option_values").delete().eq("id", valueId);
+  revalidatePath(`/admin/config/categories/${categoryId}`);
 }

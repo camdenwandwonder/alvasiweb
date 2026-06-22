@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ArrowLeft, Tags } from "lucide-react";
+import { Tags } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/primitives";
 import { NewCategoryDialog } from "./new-category-dialog";
@@ -45,12 +44,6 @@ export default async function CategoriesPage() {
 
   return (
     <div>
-      <Link
-        href="/admin/config"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> Configuratie
-      </Link>
       <PageHeader
         title="Categorieën"
         description="Elke categorie bepaalt de optie-assen (maten/kleuren) en standaardregels voor producten."
