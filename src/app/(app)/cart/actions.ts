@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
+import { getAllowance } from "@/lib/allowance";
 import { variantLabel, formatPrice } from "@/lib/format";
 import { sendEmail } from "@/lib/email";
 
@@ -21,14 +22,16 @@ export type ShipTo = {
 };
 
 /**
- * Creates one order from the cart. Prices are recomputed server-side from the
- * database (never trusted from the client). Order number + approval status are
- * set by database triggers.
+ * Creates one order from the cart. Prices/credits are recomputed server-side
+ * (never trusted from the client). If the order exceeds the member's remaining
+ * allowance (euro/credits/quantity), it is flagged as a request (is_request +
+ * reason) and the DB trigger routes it to approval.
  */
 export async function createOrderFromCart(
   items: CheckoutItem[],
   shipTo: ShipTo,
-): Promise<{ orderId: string }> {
+  options?: { reason?: string },
+): Promise<{ orderId: string; isRequest: boolean }> {
   const user = await getCurrentUser();
   if (!user || !user.companyId) throw new Error("Geen toegang");
   if (!items.length) throw new Error("Je winkelwagen is leeg");
@@ -44,27 +47,28 @@ export async function createOrderFromCart(
     quantity: number;
     unit_price: number;
     line_total: number;
+    credit_cost: number;
   }[] = [];
   let subtotal = 0;
+  let creditTotal = 0;
+  const qtyByProduct: Record<string, number> = {};
 
   for (const item of items) {
     const qty = Math.max(1, Math.floor(item.qty));
     const { data: product, error } = await supabase
       .from("products")
-      .select("id, name, sku, base_price, max_quantity_per_order")
+      .select("id, name, sku, base_price, credit_cost, max_quantity_per_order")
       .eq("id", item.productId)
       .single();
     if (error || !product) throw new Error("Product niet gevonden");
-    if (
-      product.max_quantity_per_order &&
-      qty > product.max_quantity_per_order
-    ) {
+    if (product.max_quantity_per_order && qty > product.max_quantity_per_order) {
       throw new Error(
         `Maximaal ${product.max_quantity_per_order} per bestelling voor ${product.name}`,
       );
     }
 
     let unitPrice = Number(product.base_price ?? 0);
+    const creditCost = Number(product.credit_cost ?? 0);
     let label: string | null = null;
     let sku: string | null = product.sku;
     if (item.variantId) {
@@ -76,13 +80,14 @@ export async function createOrderFromCart(
       if (variant) {
         label = variantLabel(variant.attributes as Record<string, unknown>);
         sku = variant.sku ?? sku;
-        if (variant.price_override != null)
-          unitPrice = Number(variant.price_override);
+        if (variant.price_override != null) unitPrice = Number(variant.price_override);
       }
     }
 
     const lineTotal = unitPrice * qty;
     subtotal += lineTotal;
+    creditTotal += creditCost * qty;
+    qtyByProduct[product.id] = (qtyByProduct[product.id] ?? 0) + qty;
     lines.push({
       product_id: product.id,
       variant_id: item.variantId,
@@ -92,8 +97,29 @@ export async function createOrderFromCart(
       quantity: qty,
       unit_price: unitPrice,
       line_total: lineTotal,
+      credit_cost: creditCost,
     });
   }
+
+  // Over-allowance detection in the company's mode.
+  const allowance = await getAllowance(user);
+  let isOver = false;
+  if (allowance.hasLimit) {
+    if (allowance.mode === "euro" && allowance.remaining != null)
+      isOver = subtotal > allowance.remaining;
+    else if (allowance.mode === "credits" && allowance.remaining != null)
+      isOver = creditTotal > allowance.remaining;
+    else if (allowance.mode === "quantity") {
+      for (const [pid, q] of Object.entries(qtyByProduct)) {
+        const rem = allowance.perProduct?.[pid]?.remaining;
+        if (rem != null && q > rem) isOver = true;
+      }
+    }
+  }
+
+  const reason = options?.reason?.trim() || null;
+  if (isOver && !reason)
+    throw new Error("Geef een reden op voor je aanvraag.");
 
   const { data: order, error: oErr } = await supabase
     .from("orders")
@@ -106,26 +132,21 @@ export async function createOrderFromCart(
       ship_to_postal: shipTo.postal?.trim() || null,
       ship_to_city: shipTo.city?.trim() || null,
       ship_to_country: shipTo.country?.trim() || null,
+      subtotal,
+      total: subtotal,
+      credit_total: creditTotal,
+      is_request: isOver,
+      request_reason: isOver ? reason : null,
     })
     .select("id, order_number")
     .single();
   if (oErr) throw new Error(oErr.message);
 
   const { error: iErr } = await supabase.from("order_items").insert(
-    lines.map((l) => ({
-      order_id: order.id,
-      company_id: user.companyId,
-      ...l,
-    })),
+    lines.map((l) => ({ order_id: order.id, company_id: user.companyId, ...l })),
   );
   if (iErr) throw new Error(iErr.message);
 
-  await supabase
-    .from("orders")
-    .update({ subtotal, total: subtotal })
-    .eq("id", order.id);
-
-  // Best-effort notification email to Alvasi (no-op without RESEND_API_KEY).
   const notifyTo = process.env.ALVASI_NOTIFY_EMAIL;
   if (notifyTo) {
     const rows = lines
@@ -138,13 +159,14 @@ export async function createOrderFromCart(
       .join("");
     await sendEmail({
       to: notifyTo,
-      subject: `Nieuwe bestelling ${order.order_number ?? ""} — ${user.company?.name ?? ""}`,
-      html: `<h2>Nieuwe bestelling ${order.order_number ?? ""}</h2>
+      subject: `${isOver ? "Aanvraag" : "Nieuwe bestelling"} ${order.order_number ?? ""} — ${user.company?.name ?? ""}`,
+      html: `<h2>${isOver ? "Aanvraag" : "Nieuwe bestelling"} ${order.order_number ?? ""}</h2>
         <p>Bedrijf: ${user.company?.name ?? ""}<br/>Besteld door: ${user.fullName ?? user.email ?? ""}</p>
+        ${isOver && reason ? `<p>Reden: ${reason}</p>` : ""}
         <ul>${rows}</ul>
         <p><strong>Totaal: ${formatPrice(subtotal)}</strong></p>`,
     });
   }
 
-  return { orderId: order.id };
+  return { orderId: order.id, isRequest: isOver };
 }

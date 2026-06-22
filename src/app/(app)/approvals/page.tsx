@@ -4,7 +4,7 @@ import { CheckSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
 import { Card } from "@/components/ui/card";
-import { PageHeader, EmptyState } from "@/components/primitives";
+import { PageHeader, EmptyState, StatusBadge } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
 import { formatDate, formatPrice } from "@/lib/format";
 import { approveOrder, rejectOrder } from "../orders/actions";
@@ -17,6 +17,8 @@ type OrderRow = {
   total: number;
   created_at: string;
   ordered_by: string;
+  is_request: boolean;
+  request_reason: string | null;
   items: { quantity: number; product_name: string; variant_label: string | null }[];
 };
 
@@ -28,7 +30,7 @@ export default async function ApprovalsPage() {
   const { data } = await supabase
     .from("orders")
     .select(
-      "id, order_number, total, created_at, ordered_by, items:order_items(quantity, product_name, variant_label)",
+      "id, order_number, total, created_at, ordered_by, is_request, request_reason, items:order_items(quantity, product_name, variant_label)",
     )
     .eq("status", "pending_approval")
     .order("created_at", { ascending: true });
@@ -67,12 +69,17 @@ export default async function ApprovalsPage() {
               <Card key={o.id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <Link
-                      href={`/orders/${o.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {o.order_number ?? "Bestelling"}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/orders/${o.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {o.order_number ?? "Bestelling"}
+                      </Link>
+                      {o.is_request ? (
+                        <StatusBadge tone="amber">Aanvraag</StatusBadge>
+                      ) : null}
+                    </div>
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       {names.get(o.ordered_by) ?? "Teamlid"} · {qty} artikel
                       {qty === 1 ? "" : "en"} · {formatDate(o.created_at)}
@@ -87,6 +94,11 @@ export default async function ApprovalsPage() {
                         )
                         .join(", ")}
                     </p>
+                    {o.is_request && o.request_reason ? (
+                      <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-sm text-amber-800">
+                        Reden: {o.request_reason}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{formatPrice(o.total)}</span>

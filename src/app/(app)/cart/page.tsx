@@ -18,6 +18,8 @@ export default function CartPage() {
   const cart = useCart();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [requireReason, setRequireReason] = useState(false);
+  const [reason, setReason] = useState("");
   const [ship, setShip] = useState({
     name: "",
     address: "",
@@ -29,21 +31,35 @@ export default function CartPage() {
 
   async function checkout(e: React.FormEvent) {
     e.preventDefault();
+    if (requireReason && !reason.trim()) {
+      toast.error("Geef een reden op voor je aanvraag.");
+      return;
+    }
     setSubmitting(true);
     try {
-      const { orderId } = await createOrderFromCart(
+      const { orderId, isRequest } = await createOrderFromCart(
         cart.items.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
           qty: i.qty,
         })),
         ship,
+        { reason: reason.trim() || undefined },
       );
       cart.clear();
-      toast.success("Bestelling geplaatst");
+      toast.success(isRequest ? "Aanvraag ingediend" : "Bestelling geplaatst");
       router.push(`/orders/${orderId}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Er ging iets mis");
+      const msg = err instanceof Error ? err.message : "Er ging iets mis";
+      // Budget/quota exceeded → reveal the reason field and ask to request.
+      if (msg.toLowerCase().includes("reden")) {
+        setRequireReason(true);
+        toast.warning(
+          "Je budget/limiet is bereikt. Geef een reden op om dit aan te vragen.",
+        );
+      } else {
+        toast.error(msg);
+      }
       setSubmitting(false);
     }
   }
@@ -195,11 +211,29 @@ export default function CartPage() {
                   onChange={(e) => setShip({ ...ship, note: e.target.value })}
                 />
               </Field>
+
+              {requireReason ? (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                  <p className="mb-2 text-sm font-medium text-amber-800">
+                    Budget/limiet bereikt — dien een aanvraag in
+                  </p>
+                  <Field label="Reden voor aanvraag">
+                    <Textarea
+                      rows={2}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Bijv. extra jas nodig wegens beschadiging"
+                      required
+                    />
+                  </Field>
+                </div>
+              ) : null}
+
               <Button type="submit" disabled={submitting} className="w-full">
                 {submitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                Bestelling plaatsen
+                {requireReason ? "Aanvragen" : "Bestelling plaatsen"}
               </Button>
             </form>
           </CardContent>
