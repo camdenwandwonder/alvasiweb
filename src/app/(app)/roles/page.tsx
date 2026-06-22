@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { Shield, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/primitives";
 import { NewRoleDialog } from "./new-role-dialog";
@@ -50,8 +49,8 @@ export default async function RolesPage() {
       ) : (
         <div className="space-y-2">
           {roles.map((r) => (
-            <Link key={r.id} href={`/roles/${r.id}`}>
-              <Card className="flex items-center gap-4 p-4 transition hover:border-foreground/20">
+            <Link key={r.id} href={`/roles/${r.id}`} className="block">
+              <div className="flex items-center gap-4 rounded-xl border bg-card p-4 transition hover:border-foreground/20">
                 <Shield className="h-5 w-5 text-muted-foreground" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -68,7 +67,7 @@ export default async function RolesPage() {
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </Card>
+              </div>
             </Link>
           ))}
         </div>

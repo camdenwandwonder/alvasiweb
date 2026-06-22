@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Tags, Ruler, ChevronRight } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
-import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/primitives";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +37,8 @@ export default async function ConfigOverview() {
       />
       <div className="grid gap-4 sm:grid-cols-2">
         {sections.map((s) => (
-          <Link key={s.href} href={s.href}>
-            <Card className="flex h-full items-start gap-4 p-5 transition hover:border-foreground/20 hover:shadow-md">
+          <Link key={s.href} href={s.href} className="block h-full">
+            <div className="flex h-full items-start gap-4 rounded-xl border bg-card p-5 shadow-sm transition hover:border-foreground/20 hover:shadow-md">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand)] text-[var(--brand-foreground)]">
                 <s.icon className="h-5 w-5" />
               </span>
@@ -51,7 +50,7 @@ export default async function ConfigOverview() {
                 <p className="mt-1 text-sm text-muted-foreground">{s.desc}</p>
                 <p className="mt-2 text-xs text-muted-foreground">{s.count}</p>
               </div>
-            </Card>
+            </div>
           </Link>
         ))}
       </div>

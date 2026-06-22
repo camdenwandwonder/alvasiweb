@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { ArrowLeft, Tags, ChevronRight } from "lucide-react";
+import { ArrowLeft, Tags } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/primitives";
 import { NewCategoryDialog } from "./new-category-dialog";
+import { CategoriesTable, type CategoryRow } from "./categories-table";
 
 export const dynamic = "force-dynamic";
 
-type Cat = {
+type Raw = {
   id: string;
   name: string;
   description: string | null;
@@ -16,7 +15,9 @@ type Cat = {
   default_requires_approval: boolean;
   default_requires_proof: boolean;
   default_max_quantity: number | null;
+  default_lead_time_days: number | null;
   axes: { option_set: { name: string } | null }[];
+  products: { count: number }[];
 };
 
 export default async function CategoriesPage() {
@@ -24,11 +25,23 @@ export default async function CategoriesPage() {
   const { data } = await admin
     .from("categories")
     .select(
-      "id, name, description, active, default_requires_approval, default_requires_proof, default_max_quantity, axes:category_option_sets(option_set:option_sets(name))",
+      "id, name, description, active, default_requires_approval, default_requires_proof, default_max_quantity, default_lead_time_days, axes:category_option_sets(option_set:option_sets(name)), products:products(count)",
     )
     .order("sort_order");
 
-  const categories = (data ?? []) as unknown as Cat[];
+  const raw = (data ?? []) as unknown as Raw[];
+  const rows: CategoryRow[] = raw.map((c) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    active: c.active,
+    requiresApproval: c.default_requires_approval,
+    requiresProof: c.default_requires_proof,
+    maxQty: c.default_max_quantity,
+    leadDays: c.default_lead_time_days,
+    axes: c.axes.map((a) => a.option_set?.name ?? "").filter(Boolean),
+    productCount: c.products?.[0]?.count ?? 0,
+  }));
 
   return (
     <div>
@@ -40,11 +53,11 @@ export default async function CategoriesPage() {
       </Link>
       <PageHeader
         title="Categorieën"
-        description="Elke categorie bepaalt zijn optie-assen en standaardregels voor producten."
+        description="Elke categorie bepaalt de optie-assen (maten/kleuren) en standaardregels voor producten."
         action={<NewCategoryDialog />}
       />
 
-      {categories.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState
           icon={Tags}
           title="Nog geen categorieën"
@@ -52,41 +65,7 @@ export default async function CategoriesPage() {
           action={<NewCategoryDialog />}
         />
       ) : (
-        <div className="space-y-2">
-          {categories.map((c) => (
-            <Link key={c.id} href={`/admin/config/categories/${c.id}`}>
-              <Card className="flex items-center gap-4 p-4 transition hover:border-foreground/20">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{c.name}</p>
-                    {!c.active ? <Badge variant="secondary">Inactief</Badge> : null}
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {c.axes.length ? (
-                      c.axes.map((a, i) => (
-                        <Badge key={i} variant="secondary">
-                          {a.option_set?.name ?? "—"}
-                        </Badge>
-                      ))
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        Geen optie-assen
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
-                  {c.default_requires_approval ? <Badge variant="outline">Goedkeuring</Badge> : null}
-                  {c.default_requires_proof ? <Badge variant="outline">Proef</Badge> : null}
-                  {c.default_max_quantity ? (
-                    <Badge variant="outline">Max {c.default_max_quantity}</Badge>
-                  ) : null}
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <CategoriesTable rows={rows} />
       )}
     </div>
   );
