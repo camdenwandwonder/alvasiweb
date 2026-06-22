@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar, type SidebarNavItem } from "@/components/app-sidebar";
+import { CommandPalette } from "@/components/command-palette";
 
 export function AppShell({
   brandName,
@@ -36,6 +37,7 @@ export function AppShell({
 
   return (
     <SidebarProvider style={style}>
+      <CommandPalette items={items} />
       <AppSidebar
         brandName={brandName}
         subtitle={subtitle}

@@ -46,6 +46,9 @@ export default async function AppLayout({
     items.push({ href: "/roles", label: "Rollen", icon: "roles" });
   if (can(user, "settings.manage"))
     items.push({ href: "/budgets", label: "Regels & budget", icon: "rules" });
+  if (can(user, "settings.manage"))
+    items.push({ href: "/settings", label: "Instellingen", icon: "settings" });
+  items.push({ href: "/profile", label: "Mijn profiel", icon: "profile" });
 
   return (
     <CartProvider companyId={user.company.id}>

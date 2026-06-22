@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
-import { variantLabel } from "@/lib/format";
+import { variantLabel, formatPrice } from "@/lib/format";
+import { sendEmail } from "@/lib/email";
 
 export type CheckoutItem = {
   productId: string;
@@ -106,7 +107,7 @@ export async function createOrderFromCart(
       ship_to_city: shipTo.city?.trim() || null,
       ship_to_country: shipTo.country?.trim() || null,
     })
-    .select("id")
+    .select("id, order_number")
     .single();
   if (oErr) throw new Error(oErr.message);
 
@@ -123,6 +124,27 @@ export async function createOrderFromCart(
     .from("orders")
     .update({ subtotal, total: subtotal })
     .eq("id", order.id);
+
+  // Best-effort notification email to Alvasi (no-op without RESEND_API_KEY).
+  const notifyTo = process.env.ALVASI_NOTIFY_EMAIL;
+  if (notifyTo) {
+    const rows = lines
+      .map(
+        (l) =>
+          `<li>${l.quantity} × ${l.product_name}${
+            l.variant_label ? ` (${l.variant_label})` : ""
+          } — ${formatPrice(l.line_total)}</li>`,
+      )
+      .join("");
+    await sendEmail({
+      to: notifyTo,
+      subject: `Nieuwe bestelling ${order.order_number ?? ""} — ${user.company?.name ?? ""}`,
+      html: `<h2>Nieuwe bestelling ${order.order_number ?? ""}</h2>
+        <p>Bedrijf: ${user.company?.name ?? ""}<br/>Besteld door: ${user.fullName ?? user.email ?? ""}</p>
+        <ul>${rows}</ul>
+        <p><strong>Totaal: ${formatPrice(subtotal)}</strong></p>`,
+    });
+  }
 
   return { orderId: order.id };
 }
