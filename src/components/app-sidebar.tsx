@@ -19,7 +19,6 @@ import {
   SlidersHorizontal,
   BarChart3,
   LogOut,
-  ChevronsUpDown,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -33,14 +32,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -69,6 +60,7 @@ export function AppSidebar({
   items,
   userName,
   userEmail,
+  accountHref,
 }: {
   brandName: string;
   subtitle: string;
@@ -76,6 +68,7 @@ export function AppSidebar({
   items: SidebarNavItem[];
   userName: string;
   userEmail: string;
+  accountHref: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -149,42 +142,34 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex w-full items-center gap-2 rounded-md p-2 text-left outline-none hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent">
-                <Avatar className="h-8 w-8 rounded-md">
-                  <AvatarFallback className="rounded-md bg-[var(--brand)] text-xs text-[var(--brand-foreground)]">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-                  <span className="truncate text-sm font-medium">
-                    {userName || userEmail}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {userEmail}
-                  </span>
-                </div>
-                <ChevronsUpDown className="ml-auto h-4 w-4 group-data-[collapsible=icon]:hidden" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                side="top"
-                className="w-56"
-              >
-                <DropdownMenuLabel className="truncate">
-                  {userEmail}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Uitloggen
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <div className="flex items-center gap-1">
+          <Link
+            href={accountHref}
+            className="flex flex-1 items-center gap-2 overflow-hidden rounded-md p-2 text-left outline-none hover:bg-sidebar-accent"
+          >
+            <Avatar className="h-8 w-8 rounded-md">
+              <AvatarFallback className="rounded-md bg-[var(--brand)] text-xs text-[var(--brand-foreground)]">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate text-sm font-medium">
+                {userName || userEmail}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {userEmail}
+              </span>
+            </div>
+          </Link>
+          <button
+            onClick={signOut}
+            title="Uitloggen"
+            aria-label="Uitloggen"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-foreground group-data-[collapsible=icon]:hidden"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

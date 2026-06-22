@@ -30,6 +30,7 @@ export default async function AdminLayout({
       items={NAV}
       userName={user.fullName ?? "Alvasi Beheer"}
       userEmail={user.email ?? ""}
+      accountHref="/admin/account"
       topbarTitle="Alvasi Beheer"
     >
       {children}

@@ -16,6 +16,7 @@ export function AppShell({
   items,
   userName,
   userEmail,
+  accountHref,
   topbarTitle,
   children,
 }: {
@@ -27,6 +28,7 @@ export function AppShell({
   items: SidebarNavItem[];
   userName: string;
   userEmail: string;
+  accountHref: string;
   topbarTitle?: string;
   children: React.ReactNode;
 }) {
@@ -45,6 +47,7 @@ export function AppShell({
         items={items}
         userName={userName}
         userEmail={userEmail}
+        accountHref={accountHref}
       />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">

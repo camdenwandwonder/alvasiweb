@@ -61,6 +61,7 @@ export default async function AppLayout({
         items={items}
         userName={user.fullName ?? ""}
         userEmail={user.email ?? ""}
+        accountHref="/account"
         topbarTitle={user.company.name}
       >
         {children}
