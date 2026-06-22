@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 
@@ -8,6 +9,35 @@ async function requireSuperadmin() {
   const user = await getCurrentUser();
   if (!user?.isSuperadmin) throw new Error("Not authorized");
   return user;
+}
+
+export async function updateCompany(id: string, formData: FormData) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) throw new Error("Naam is verplicht");
+
+  const update: Record<string, unknown> = {
+    name,
+    primary_color: String(formData.get("primary_color") || "#0f172a"),
+    secondary_color: String(formData.get("secondary_color") || "#6366f1"),
+  };
+  const logo = String(formData.get("logo_url") ?? "").trim();
+  if (logo) update.logo_url = logo;
+
+  const { error } = await admin.from("companies").update(update).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/companies/${id}`);
+  revalidatePath("/admin/companies");
+}
+
+export async function deleteCompany(id: string) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from("companies").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/companies");
+  redirect("/admin/companies");
 }
 
 function splitList(value: FormDataEntryValue | null): string[] {

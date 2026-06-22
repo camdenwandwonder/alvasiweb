@@ -31,7 +31,6 @@ export default async function AdminLayout({
       userName={user.fullName ?? "Alvasi Beheer"}
       userEmail={user.email ?? ""}
       accountHref="/admin/account"
-      topbarTitle="Alvasi Beheer"
     >
       {children}
     </AppShell>

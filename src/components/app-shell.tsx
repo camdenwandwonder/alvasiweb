@@ -6,6 +6,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar, type SidebarNavItem } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 export function AppShell({
   brandName,
@@ -17,7 +18,6 @@ export function AppShell({
   userName,
   userEmail,
   accountHref,
-  topbarTitle,
   children,
 }: {
   brandName: string;
@@ -29,7 +29,6 @@ export function AppShell({
   userName: string;
   userEmail: string;
   accountHref: string;
-  topbarTitle?: string;
   children: React.ReactNode;
 }) {
   const style = {
@@ -53,7 +52,7 @@ export function AppShell({
         <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 h-5" />
-          <span className="text-sm font-medium">{topbarTitle ?? brandName}</span>
+          <Breadcrumbs />
         </header>
         <div className="p-4 md:p-6">{children}</div>
       </SidebarInset>

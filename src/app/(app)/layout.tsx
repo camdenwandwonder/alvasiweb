@@ -62,7 +62,6 @@ export default async function AppLayout({
         userName={user.fullName ?? ""}
         userEmail={user.email ?? ""}
         accountHref="/account"
-        topbarTitle={user.company.name}
       >
         {children}
       </AppShell>

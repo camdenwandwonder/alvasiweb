@@ -12,6 +12,7 @@ export function ImageUploader({
   bucket,
   defaultUrl,
   aspect = "video",
+  onChange,
 }: {
   /** Hidden input name — the resulting public URL is submitted under this. */
   name: string;
@@ -19,8 +20,13 @@ export function ImageUploader({
   bucket: string;
   defaultUrl?: string | null;
   aspect?: "video" | "square";
+  onChange?: (url: string) => void;
 }) {
-  const [url, setUrl] = useState(defaultUrl ?? "");
+  const [url, setUrlState] = useState(defaultUrl ?? "");
+  const setUrl = (u: string) => {
+    setUrlState(u);
+    onChange?.(u);
+  };
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);

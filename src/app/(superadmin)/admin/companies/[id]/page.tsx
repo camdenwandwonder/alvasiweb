@@ -1,16 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Package, Users, Plus } from "lucide-react";
+import { ArrowLeft, Package, Users, Plus, LayoutDashboard, Palette } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageHeader, EmptyState, Field, NativeSelect } from "@/components/primitives";
+import {
+  PageHeader,
+  EmptyState,
+  Field,
+  NativeSelect,
+  StatCard,
+} from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
+import { CompanyBrandingForm } from "@/components/company-branding-form";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { BrandPreview } from "@/components/brand-preview";
 import { formatPrice } from "@/lib/format";
-import { createCompanyUser } from "./actions";
+import { createCompanyUser, updateCompany, deleteCompany } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +65,9 @@ export default async function CompanyDetailPage({
         .order("created_at", { ascending: false }),
     ]);
 
+  const productList = products ?? [];
+  const userList = users ?? [];
+
   return (
     <div>
       <Link
@@ -65,25 +77,16 @@ export default async function CompanyDetailPage({
         <ArrowLeft className="h-4 w-4" /> Alle bedrijven
       </Link>
 
-      <PageHeader
-        title={company.name}
-        description={`/${company.slug}`}
-        action={
-          <>
-            <span
-              className="h-9 w-9 rounded-lg border"
-              style={{ background: company.primary_color }}
-            />
-            <span
-              className="h-9 w-9 rounded-lg border"
-              style={{ background: company.secondary_color }}
-            />
-          </>
-        }
-      />
+      <PageHeader title={company.name} description={`/${company.slug}`} />
 
-      <Tabs defaultValue="products" className="w-full">
+      <Tabs defaultValue="overview" className="w-full">
         <TabsList>
+          <TabsTrigger value="overview">
+            <LayoutDashboard className="h-4 w-4" /> Overzicht
+          </TabsTrigger>
+          <TabsTrigger value="branding">
+            <Palette className="h-4 w-4" /> Huisstijl
+          </TabsTrigger>
           <TabsTrigger value="products">
             <Package className="h-4 w-4" /> Producten
           </TabsTrigger>
@@ -91,6 +94,62 @@ export default async function CompanyDetailPage({
             <Users className="h-4 w-4" /> Gebruikers
           </TabsTrigger>
         </TabsList>
+
+        {/* Overzicht */}
+        <TabsContent value="overview" className="mt-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard label="Producten" value={productList.length} icon={Package} accent />
+            <StatCard label="Gebruikers" value={userList.length} icon={Users} />
+            <div className="sm:col-span-1">
+              <BrandPreview
+                name={company.name}
+                primary={company.primary_color}
+                secondary={company.secondary_color}
+                logoUrl={company.logo_url}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Huisstijl */}
+        <TabsContent value="branding" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Huisstijl bewerken</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CompanyBrandingForm
+                action={updateCompany.bind(null, id)}
+                defaultName={company.name}
+                defaultLogoUrl={company.logo_url}
+                defaultPrimary={company.primary_color}
+                defaultSecondary={company.secondary_color}
+                submitLabel="Wijzigingen opslaan"
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6 border-destructive/30">
+            <CardHeader>
+              <CardTitle className="text-base text-destructive">
+                Gevarenzone
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Verwijder dit bedrijf en alle bijbehorende gegevens. Dit kan niet
+                ongedaan worden gemaakt.
+              </p>
+              <ConfirmDialog
+                action={deleteCompany.bind(null, id)}
+                triggerLabel="Bedrijf verwijderen"
+                title={`${company.name} verwijderen?`}
+                description="Alle producten, gebruikers en bestellingen van dit bedrijf worden verwijderd."
+                confirmLabel="Definitief verwijderen"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Producten */}
         <TabsContent value="products" className="mt-4">
@@ -102,11 +161,11 @@ export default async function CompanyDetailPage({
               <Plus className="h-4 w-4" /> Nieuw product
             </Link>
           </div>
-          {!products || products.length === 0 ? (
+          {productList.length === 0 ? (
             <EmptyState icon={Package} title="Nog geen producten" />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {products.map((p) => {
+              {productList.map((p) => {
                 const img =
                   (p.images as { url: string; is_primary: boolean }[] | null)?.find(
                     (i) => i.is_primary,
@@ -156,20 +215,18 @@ export default async function CompanyDetailPage({
         <TabsContent value="users" className="mt-4">
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
             <div>
-              {!users || users.length === 0 ? (
+              {userList.length === 0 ? (
                 <EmptyState icon={Users} title="Nog geen gebruikers" />
               ) : (
                 <ul className="space-y-2">
-                  {users.map((u) => (
+                  {userList.map((u) => (
                     <li
                       key={u.id}
                       className="flex items-center justify-between rounded-xl border bg-card p-4"
                     >
                       <div>
                         <p className="font-medium">{u.full_name ?? u.email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {u.email}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{u.email}</p>
                       </div>
                       <Badge variant="secondary">
                         {(u.role as unknown as { name: string } | null)?.name ??

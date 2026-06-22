@@ -1,81 +1,57 @@
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { Building2, Plus } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
-import { Card } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import { PageHeader, EmptyState } from "@/components/primitives";
-import { NewCompanyDialog } from "./new-company-dialog";
+import { CompaniesTable, type CompanyRow } from "./companies-table";
 
 export const dynamic = "force-dynamic";
 
 export default async function CompaniesPage() {
   const admin = createAdminClient();
-  const { data: companies } = await admin
+  const { data } = await admin
     .from("companies")
     .select(
       "id, name, slug, logo_url, primary_color, secondary_color, products:products(count), profiles:profiles(count)",
     )
     .order("created_at", { ascending: false });
 
+  const companies: CompanyRow[] = (data ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    logo_url: c.logo_url,
+    primary_color: c.primary_color,
+    secondary_color: c.secondary_color,
+    productCount: (c.products as { count: number }[] | null)?.[0]?.count ?? 0,
+    userCount: (c.profiles as { count: number }[] | null)?.[0]?.count ?? 0,
+  }));
+
   return (
     <div>
       <PageHeader
         title="Bedrijven"
         description="Je klantbedrijven en hun gebrande portalen."
-        action={<NewCompanyDialog />}
+        action={
+          <Link href="/admin/companies/new" className={buttonVariants()}>
+            <Plus className="h-4 w-4" /> Nieuw bedrijf
+          </Link>
+        }
       />
 
-      {!companies || companies.length === 0 ? (
+      {companies.length === 0 ? (
         <EmptyState
           icon={Building2}
           title="Nog geen bedrijven"
           description="Maak je eerste klantbedrijf aan om te beginnen."
-          action={<NewCompanyDialog />}
+          action={
+            <Link href="/admin/companies/new" className={buttonVariants()}>
+              <Plus className="h-4 w-4" /> Nieuw bedrijf
+            </Link>
+          }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {companies.map((c) => {
-            const productCount =
-              (c.products as { count: number }[] | null)?.[0]?.count ?? 0;
-            const userCount =
-              (c.profiles as { count: number }[] | null)?.[0]?.count ?? 0;
-            return (
-              <Link key={c.id} href={`/admin/companies/${c.id}`}>
-                <Card className="p-5 transition hover:border-foreground/20 hover:shadow-md">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="flex h-11 w-11 items-center justify-center rounded-lg text-base font-bold text-white"
-                      style={{ background: c.primary_color }}
-                    >
-                      {c.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{c.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        /{c.slug}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      {productCount} product{productCount === 1 ? "" : "en"} ·{" "}
-                      {userCount} gebruiker{userCount === 1 ? "" : "s"}
-                    </p>
-                    <div className="flex gap-1.5">
-                      <span
-                        className="h-5 w-5 rounded-full border"
-                        style={{ background: c.primary_color }}
-                      />
-                      <span
-                        className="h-5 w-5 rounded-full border"
-                        style={{ background: c.secondary_color }}
-                      />
-                    </div>
-                  </div>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
+        <CompaniesTable companies={companies} />
       )}
     </div>
   );
