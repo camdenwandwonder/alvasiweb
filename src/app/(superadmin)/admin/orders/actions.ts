@@ -74,6 +74,22 @@ export async function moveOrderStatus(
   }
 }
 
+/** Permanently delete an order (and its items/events/proofs via cascade). */
+export async function deleteOrder(
+  orderId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireSuperadmin();
+    const admin = createAdminClient();
+    const { error } = await admin.from("orders").delete().eq("id", orderId);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/admin/orders");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Mislukt" };
+  }
+}
+
 /** Toggle the personal production check-off on a single order line. */
 export async function toggleOrderItemChecked(
   itemId: string,

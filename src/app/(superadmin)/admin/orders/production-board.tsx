@@ -3,12 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { LayoutGrid, List, ExternalLink, GripVertical } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import {
+  LayoutGrid,
+  List,
+  ExternalLink,
+  GripVertical,
+  Trash2,
+} from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { NativeSelect } from "@/components/primitives";
 import { formatPrice, ORDER_STATUS } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { moveOrderStatus, toggleOrderItemChecked } from "./actions";
+import {
+  moveOrderStatus,
+  toggleOrderItemChecked,
+  deleteOrder,
+} from "./actions";
 
 export type BoardItem = {
   id: string;
@@ -73,6 +83,24 @@ export function ProductionBoard({ orders: initial }: { orders: BoardOrder[] }) {
       toast.error(res.error);
     } else {
       toast.success(`Verplaatst naar “${ORDER_STATUS[status]?.label ?? status}”`);
+    }
+  }
+
+  async function remove(orderId: string, label: string) {
+    if (
+      !window.confirm(
+        `Bestelling ${label} definitief verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+      )
+    )
+      return;
+    const prev = orders;
+    setOrders((os) => os.filter((o) => o.id !== orderId));
+    const res = await deleteOrder(orderId);
+    if (!res.ok) {
+      setOrders(prev);
+      toast.error(res.error);
+    } else {
+      toast.success("Bestelling verwijderd");
     }
   }
 
@@ -172,6 +200,7 @@ export function ProductionBoard({ orders: initial }: { orders: BoardOrder[] }) {
                         setOverCol(null);
                       }}
                       onToggleItem={toggleItem}
+                      onDelete={remove}
                     />
                   ))}
                   {list.length === 0 ? (
@@ -185,7 +214,12 @@ export function ProductionBoard({ orders: initial }: { orders: BoardOrder[] }) {
           })}
         </div>
       ) : (
-        <ListView orders={orders} onMove={move} onToggleItem={toggleItem} />
+        <ListView
+          orders={orders}
+          onMove={move}
+          onToggleItem={toggleItem}
+          onDelete={remove}
+        />
       )}
     </div>
   );
@@ -197,12 +231,14 @@ function OrderCard({
   onDragStart,
   onDragEnd,
   onToggleItem,
+  onDelete,
 }: {
   order: BoardOrder;
   dragging: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   onToggleItem: (orderId: string, itemId: string, checked: boolean) => void;
+  onDelete: (orderId: string, label: string) => void;
 }) {
   const totalQty = order.items.reduce((s, i) => s + i.quantity, 0);
   return (
@@ -278,13 +314,27 @@ function OrderCard({
             </span>
           ) : null}
         </span>
-        <Link
-          href={`/admin/orders/${order.id}`}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <ExternalLink className="h-3.5 w-3.5" /> Bekijk
-        </Link>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Verwijderen"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(order.id, order.order_number ?? "deze bestelling");
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Link
+            href={`/admin/orders/${order.id}`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExternalLink className="h-3.5 w-3.5" /> Bekijk
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -294,10 +344,12 @@ function ListView({
   orders,
   onMove,
   onToggleItem,
+  onDelete,
 }: {
   orders: BoardOrder[];
   onMove: (orderId: string, status: string) => void;
   onToggleItem: (orderId: string, itemId: string, checked: boolean) => void;
+  onDelete: (orderId: string, label: string) => void;
 }) {
   if (orders.length === 0)
     return (
@@ -378,13 +430,29 @@ function ListView({
                   ))}
                 </NativeSelect>
               </td>
-              <td className="px-4 py-3 text-right">
-                <Link
-                  href={`/admin/orders/${o.id}`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  <ExternalLink className="h-3.5 w-3.5" /> Bekijk
-                </Link>
+              <td className="px-4 py-3">
+                <div className="flex items-center justify-end gap-1">
+                  <Link
+                    href={`/admin/orders/${o.id}`}
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                    })}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Bekijk
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Verwijderen"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() =>
+                      onDelete(o.id, o.order_number ?? "deze bestelling")
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}
