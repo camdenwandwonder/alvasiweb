@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, can } from "@/lib/auth/user";
+import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PageHeader, Field } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
 import { ImageUploader } from "@/components/image-uploader";
+import { CompanyAddressesPanel } from "@/components/company-addresses-panel";
+import type { CompanyAddress } from "@/lib/address-actions";
 import { updateBranding } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -14,11 +17,19 @@ export default async function SettingsPage() {
   if (!can(user, "settings.manage") || !user?.company) redirect("/dashboard");
   const company = user.company;
 
+  const supabase = await createClient();
+  const { data: addresses } = await supabase
+    .from("company_addresses")
+    .select("*")
+    .eq("company_id", company.id)
+    .order("is_default", { ascending: false })
+    .order("sort_order");
+
   return (
-    <div className="max-w-xl">
+    <div className="max-w-xl space-y-6">
       <PageHeader
         title="Instellingen"
-        description="Beheer de huisstijl van je bedrijfsportaal."
+        description="Beheer de huisstijl en leveradressen van je bedrijfsportaal."
       />
 
       <Card>
@@ -60,6 +71,11 @@ export default async function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      <CompanyAddressesPanel
+        companyId={company.id}
+        addresses={(addresses ?? []) as CompanyAddress[]}
+      />
     </div>
   );
 }

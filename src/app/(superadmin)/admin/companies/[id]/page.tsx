@@ -10,6 +10,7 @@ import {
   Eye,
   Wallet,
   Images,
+  MapPin,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,8 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BrandPreview } from "@/components/brand-preview";
 import { ProductThumb } from "@/components/product-thumb";
 import { BudgetSettingsPanel } from "@/components/budget-settings-panel";
+import { CompanyAddressesPanel } from "@/components/company-addresses-panel";
+import type { CompanyAddress } from "@/lib/address-actions";
 import type { BudgetMode } from "@/lib/allowance";
 import { CompanyMedia } from "./company-media";
 import { formatPrice } from "@/lib/format";
@@ -71,6 +74,7 @@ export default async function CompanyDetailPage({
     { data: budgets },
     { data: allotments },
     { data: media },
+    { data: addresses },
   ] = await Promise.all([
     admin
       .from("products")
@@ -107,6 +111,12 @@ export default async function CompanyDetailPage({
       .from("company_media")
       .select("id, url")
       .eq("company_id", id)
+      .order("sort_order"),
+    admin
+      .from("company_addresses")
+      .select("*")
+      .eq("company_id", id)
+      .order("is_default", { ascending: false })
       .order("sort_order"),
   ]);
 
@@ -165,6 +175,9 @@ export default async function CompanyDetailPage({
           </TabsTrigger>
           <TabsTrigger value="budget">
             <Wallet className="h-4 w-4" /> Bestelwijze
+          </TabsTrigger>
+          <TabsTrigger value="addresses">
+            <MapPin className="h-4 w-4" /> Leveradressen
           </TabsTrigger>
           <TabsTrigger value="media">
             <Images className="h-4 w-4" /> Sfeerbeelden
@@ -439,6 +452,14 @@ export default async function CompanyDetailPage({
             products={productList.map((p) => ({ id: p.id, name: p.name }))}
             budgets={(budgets ?? []) as never}
             allotments={(allotments ?? []) as never}
+          />
+        </TabsContent>
+
+        {/* Leveradressen */}
+        <TabsContent value="addresses" className="mt-4">
+          <CompanyAddressesPanel
+            companyId={id}
+            addresses={(addresses ?? []) as CompanyAddress[]}
           />
         </TabsContent>
 

@@ -21,6 +21,14 @@ export type ShipTo = {
   note?: string;
 };
 
+export type Delivery = {
+  /** Selected saved company address; empty = manual entry. */
+  addressId?: string | null;
+  /** Manual address fields (used when addressId is empty). */
+  custom?: ShipTo;
+  note?: string;
+};
+
 /**
  * Creates one order from the cart. Prices/credits are recomputed server-side
  * (never trusted from the client). If the order exceeds the member's remaining
@@ -29,7 +37,7 @@ export type ShipTo = {
  */
 export async function createOrderFromCart(
   items: CheckoutItem[],
-  shipTo: ShipTo,
+  delivery: Delivery,
   options?: { reason?: string },
 ): Promise<{ orderId: string; isRequest: boolean }> {
   const user = await getCurrentUser();
@@ -37,6 +45,37 @@ export async function createOrderFromCart(
   if (!items.length) throw new Error("Je winkelwagen is leeg");
 
   const supabase = await createClient();
+
+  // Resolve the delivery address. A selected saved company address is trusted
+  // (loaded server-side); a manual address is only treated as a deviation that
+  // needs approval when the company actually has saved addresses to deviate from.
+  const note = delivery.note?.trim() || null;
+  let shipTo: ShipTo = {};
+  let addressIsCustom = false;
+
+  if (delivery.addressId) {
+    const { data: addr } = await supabase
+      .from("company_addresses")
+      .select("label, recipient, street, postal_code, city, country")
+      .eq("id", delivery.addressId)
+      .eq("company_id", user.companyId)
+      .single();
+    if (!addr) throw new Error("Gekozen leveradres niet gevonden");
+    shipTo = {
+      name: addr.recipient ?? addr.label,
+      address: addr.street ?? undefined,
+      postal: addr.postal_code ?? undefined,
+      city: addr.city ?? undefined,
+      country: addr.country ?? undefined,
+    };
+  } else {
+    shipTo = delivery.custom ?? {};
+    const { count } = await supabase
+      .from("company_addresses")
+      .select("*", { count: "exact", head: true })
+      .eq("company_id", user.companyId);
+    addressIsCustom = (count ?? 0) > 0;
+  }
 
   const lines: {
     product_id: string;
@@ -117,26 +156,43 @@ export async function createOrderFromCart(
     }
   }
 
-  const reason = options?.reason?.trim() || null;
-  if (isOver && !reason)
+  const userReason = options?.reason?.trim() || null;
+  // Over-allowance still requires a written reason from the member.
+  if (isOver && !userReason)
     throw new Error("Geef een reden op voor je aanvraag.");
+
+  // A custom delivery address always routes to approval (auto reason).
+  const reasonParts: string[] = [];
+  if (isOver && userReason) reasonParts.push(userReason);
+  if (addressIsCustom) {
+    const addrText = [shipTo.name, shipTo.address, shipTo.postal, shipTo.city]
+      .map((s) => s?.trim())
+      .filter(Boolean)
+      .join(", ");
+    reasonParts.push(
+      `Afwijkend leveradres${addrText ? `: ${addrText}` : ""}`,
+    );
+  }
+  const isRequest = isOver || addressIsCustom;
+  const finalReason = reasonParts.join(" · ") || null;
 
   const { data: order, error: oErr } = await supabase
     .from("orders")
     .insert({
       company_id: user.companyId,
       ordered_by: user.id,
-      note: shipTo.note?.trim() || null,
+      note,
       ship_to_name: shipTo.name?.trim() || null,
       ship_to_address: shipTo.address?.trim() || null,
       ship_to_postal: shipTo.postal?.trim() || null,
       ship_to_city: shipTo.city?.trim() || null,
       ship_to_country: shipTo.country?.trim() || null,
+      ship_to_custom: addressIsCustom,
       subtotal,
       total: subtotal,
       credit_total: creditTotal,
-      is_request: isOver,
-      request_reason: isOver ? reason : null,
+      is_request: isRequest,
+      request_reason: finalReason,
     })
     .select("id, order_number")
     .single();
@@ -159,14 +215,14 @@ export async function createOrderFromCart(
       .join("");
     await sendEmail({
       to: notifyTo,
-      subject: `${isOver ? "Aanvraag" : "Nieuwe bestelling"} ${order.order_number ?? ""} — ${user.company?.name ?? ""}`,
-      html: `<h2>${isOver ? "Aanvraag" : "Nieuwe bestelling"} ${order.order_number ?? ""}</h2>
+      subject: `${isRequest ? "Aanvraag" : "Nieuwe bestelling"} ${order.order_number ?? ""} — ${user.company?.name ?? ""}`,
+      html: `<h2>${isRequest ? "Aanvraag" : "Nieuwe bestelling"} ${order.order_number ?? ""}</h2>
         <p>Bedrijf: ${user.company?.name ?? ""}<br/>Besteld door: ${user.fullName ?? user.email ?? ""}</p>
-        ${isOver && reason ? `<p>Reden: ${reason}</p>` : ""}
+        ${finalReason ? `<p>Reden: ${finalReason}</p>` : ""}
         <ul>${rows}</ul>
         <p><strong>Totaal: ${formatPrice(subtotal)}</strong></p>`,
     });
   }
 
-  return { orderId: order.id, isRequest: isOver };
+  return { orderId: order.id, isRequest };
 }
