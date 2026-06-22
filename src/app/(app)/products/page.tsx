@@ -1,19 +1,11 @@
-import { Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
 import { PageHeader } from "@/components/primitives";
 import { ShopGrid, type ShopProduct } from "@/components/shop-grid";
+import { AllowanceBanner } from "@/components/allowance-banner";
 import { getAllowance } from "@/lib/allowance";
-import { formatPrice } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
-
-const PERIOD: Record<string, string> = {
-  monthly: "deze maand",
-  quarterly: "dit kwartaal",
-  yearly: "dit jaar",
-  once: "totaal",
-};
 
 type Raw = {
   id: string;
@@ -81,11 +73,6 @@ export default async function ProductsPage() {
     if (p.category_id && p.category_name) catMap.set(p.category_id, p.category_name);
   const categories = [...catMap.entries()].map(([id, name]) => ({ id, name }));
 
-  const pct =
-    allowance.hasLimit && allowance.total
-      ? Math.min(100, Math.max(0, (allowance.used / allowance.total) * 100))
-      : 0;
-
   return (
     <div>
       <PageHeader
@@ -93,45 +80,7 @@ export default async function ProductsPage() {
         description="Blader door en bestel de producten van jouw bedrijf."
       />
 
-      {allowance.hasLimit &&
-      (allowance.mode === "euro" || allowance.mode === "credits") ? (
-        <div className="mb-6 rounded-xl border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <Wallet className="h-4 w-4 text-[var(--brand)]" /> Resterend{" "}
-              {allowance.mode === "credits" ? "credits" : "budget"}
-              {allowance.period ? ` (${PERIOD[allowance.period]})` : ""}
-            </span>
-            <span className="text-sm">
-              <span className="font-semibold">
-                {allowance.mode === "credits"
-                  ? `${allowance.remaining} credits`
-                  : formatPrice(allowance.remaining)}
-              </span>{" "}
-              <span className="text-muted-foreground">
-                van{" "}
-                {allowance.mode === "credits"
-                  ? `${allowance.total} credits`
-                  : formatPrice(allowance.total)}
-              </span>
-            </span>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-[var(--brand)]"
-              style={{ width: `${100 - pct}%` }}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {allowance.mode === "quantity" && allowance.hasLimit ? (
-        <div className="mb-6 flex items-center gap-2 rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-          <Wallet className="h-4 w-4 text-[var(--brand)]" /> Je hebt een vast
-          aantal per product. Het resterende aantal staat per product
-          aangegeven.
-        </div>
-      ) : null}
+      <AllowanceBanner allowance={allowance} />
 
       <ShopGrid
         products={products}
