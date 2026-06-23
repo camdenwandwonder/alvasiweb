@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [logoOk, setLogoOk] = useState(true);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,10 +43,22 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-foreground text-lg font-bold text-background">
-            A
-          </div>
-          <h1 className="text-xl font-semibold">Alvasi</h1>
+          {logoOk ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src="/alvasi-logo.png"
+              alt="Alvasi"
+              onError={() => setLogoOk(false)}
+              className="mb-2 h-12 w-auto object-contain"
+            />
+          ) : (
+            <>
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-foreground text-lg font-bold text-background">
+                A
+              </div>
+              <h1 className="text-xl font-semibold">Alvasi</h1>
+            </>
+          )}
           <p className="text-sm text-muted-foreground">Bestelplatform</p>
         </div>
         <Card>
