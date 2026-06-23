@@ -49,7 +49,7 @@ export default function LoginPage() {
               src="/alvasi-logo.png"
               alt="Alvasi"
               onError={() => setLogoOk(false)}
-              className="mb-2 h-12 w-auto object-contain"
+              className="mb-2 h-16 w-auto object-contain"
             />
           ) : (
             <>
