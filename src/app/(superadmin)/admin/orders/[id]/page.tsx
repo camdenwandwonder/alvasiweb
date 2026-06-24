@@ -7,6 +7,8 @@ import { StatusBadge } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
 import { ImageUploader } from "@/components/image-uploader";
 import { formatDate, formatPrice, ORDER_STATUS } from "@/lib/format";
+import { getIntegration } from "@/lib/jamespro/sync";
+import { retryOrderSync } from "@/lib/jamespro/actions";
 import { advanceOrderStatus, addProof } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -55,18 +57,25 @@ export default async function AdminOrderDetail({
     .maybeSingle();
   if (!order) notFound();
 
-  const [{ data: proofs }, { data: events }] = await Promise.all([
-    admin
-      .from("proofs")
-      .select("id, version, file_url, status, created_at")
-      .eq("order_id", id)
-      .order("version", { ascending: false }),
-    admin
-      .from("order_events")
-      .select("id, status, note, created_at")
-      .eq("order_id", id)
-      .order("created_at", { ascending: false }),
-  ]);
+  const [{ data: proofs }, { data: events }, { data: sync }, integration] =
+    await Promise.all([
+      admin
+        .from("proofs")
+        .select("id, version, file_url, status, created_at")
+        .eq("order_id", id)
+        .order("version", { ascending: false }),
+      admin
+        .from("order_events")
+        .select("id, status, note, created_at")
+        .eq("order_id", id)
+        .order("created_at", { ascending: false }),
+      admin
+        .from("jamespro_sync")
+        .select("status, jamespro_project_id, jamespro_task_id, last_error")
+        .eq("order_id", id)
+        .maybeSingle(),
+      getIntegration(),
+    ]);
 
   const status = ORDER_STATUS[order.status] ?? {
     label: order.status,
@@ -160,6 +169,49 @@ export default async function AdminOrderDetail({
           ) : null}
         </CardContent>
       </Card>
+
+      {/* JamesPRO sync */}
+      {integration?.enabled ? (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">JamesPRO</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {sync?.status === "success" ? (
+              <p className="text-sm text-emerald-700">
+                Project #{sync.jamespro_project_id} en taak #
+                {sync.jamespro_task_id} aangemaakt in JamesPRO.
+              </p>
+            ) : sync?.status === "error" ? (
+              <div className="space-y-3">
+                <p className="text-sm text-destructive">
+                  Synchronisatie mislukt: {sync.last_error}
+                </p>
+                <form action={retryOrderSync.bind(null, id)}>
+                  <SubmitButton size="sm" variant="outline">
+                    Opnieuw proberen
+                  </SubmitButton>
+                </form>
+              </div>
+            ) : sync ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  In wachtrij voor synchronisatie…
+                </p>
+                <form action={retryOrderSync.bind(null, id)}>
+                  <SubmitButton size="sm" variant="outline">
+                    Nu synchroniseren
+                  </SubmitButton>
+                </form>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Wordt gesynchroniseerd zodra de bestelling is goedgekeurd.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Proofs */}
       <Card className="mb-6">

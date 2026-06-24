@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   BarChart3,
   Eye,
+  Plug,
   LogOut,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -52,6 +53,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   visibility: Eye,
   reports: BarChart3,
   production: Boxes,
+  integrations: Plug,
   settings: Settings,
 };
 

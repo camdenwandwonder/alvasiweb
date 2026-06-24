@@ -1,8 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
+import { processOrderSync } from "@/lib/jamespro/sync";
 
 async function decideOrder(orderId: string, status: "approved" | "rejected") {
   const user = await getCurrentUser();
@@ -32,6 +34,14 @@ async function decideOrder(orderId: string, status: "approved" | "rejected") {
       actor: user.id,
       status,
       note: status === "approved" ? "Goedgekeurd" : "Afgewezen",
+    });
+  }
+
+  // The DB trigger enqueues a JamesPRO sync row when status becomes approved;
+  // process it right after the response so the project/task appear promptly.
+  if (status === "approved") {
+    after(async () => {
+      await processOrderSync(orderId);
     });
   }
 

@@ -1,10 +1,12 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { getAllowance } from "@/lib/allowance";
 import { variantLabel, formatPrice } from "@/lib/format";
 import { sendEmail } from "@/lib/email";
+import { processOrderSync } from "@/lib/jamespro/sync";
 
 export type CheckoutItem = {
   productId: string;
@@ -210,7 +212,7 @@ export async function createOrderFromCart(
       is_request: isRequest,
       request_reason: finalReason,
     })
-    .select("id, order_number")
+    .select("id, order_number, status")
     .single();
   if (oErr || !order)
     return { ok: false, error: `Bestelling mislukt: ${oErr?.message ?? "onbekend"}` };
@@ -239,6 +241,13 @@ export async function createOrderFromCart(
         ${finalReason ? `<p>Reden: ${finalReason}</p>` : ""}
         <ul>${rows}</ul>
         <p><strong>Totaal: ${formatPrice(subtotal)}</strong></p>`,
+    });
+  }
+
+  // Auto-approved orders are synced to JamesPRO right after the response.
+  if (order.status === "approved") {
+    after(async () => {
+      await processOrderSync(order.id);
     });
   }
 

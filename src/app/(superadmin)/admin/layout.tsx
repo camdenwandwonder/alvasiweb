@@ -11,6 +11,7 @@ const NAV: SidebarNavItem[] = [
   { href: "/admin/catalog", label: "Catalogus", icon: "catalog" },
   { href: "/admin/orders", label: "Productie", icon: "production" },
   { href: "/admin/reports", label: "Rapportages", icon: "reports" },
+  { href: "/admin/integrations", label: "Integraties", icon: "integrations" },
   { href: "/admin/config", label: "Configuratie", icon: "settings" },
 ];
 

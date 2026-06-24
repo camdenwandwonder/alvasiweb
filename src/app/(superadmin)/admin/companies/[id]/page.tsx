@@ -11,6 +11,7 @@ import {
   Wallet,
   Images,
   MapPin,
+  Plug,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,9 @@ import { BudgetSettingsPanel } from "@/components/budget-settings-panel";
 import { CompanyAddressesPanel } from "@/components/company-addresses-panel";
 import type { CompanyAddress } from "@/lib/address-actions";
 import type { BudgetMode } from "@/lib/allowance";
+import { getIntegration } from "@/lib/jamespro/sync";
 import { CompanyMedia } from "./company-media";
+import { CompanyJamespro } from "./company-jamespro";
 import { formatPrice } from "@/lib/format";
 import {
   createCompanyUser,
@@ -61,10 +64,14 @@ export default async function CompanyDetailPage({
 
   const { data: company } = await admin
     .from("companies")
-    .select("id, name, slug, logo_url, primary_color, secondary_color, settings")
+    .select(
+      "id, name, slug, logo_url, primary_color, secondary_color, settings, jamespro_company_id",
+    )
     .eq("id", id)
     .maybeSingle();
   if (!company) notFound();
+
+  const jamesproConnected = !!(await getIntegration())?.enabled;
 
   const [
     { data: products },
@@ -178,6 +185,9 @@ export default async function CompanyDetailPage({
           </TabsTrigger>
           <TabsTrigger value="addresses">
             <MapPin className="h-4 w-4" /> Leveradressen
+          </TabsTrigger>
+          <TabsTrigger value="jamespro">
+            <Plug className="h-4 w-4" /> JamesPRO
           </TabsTrigger>
           <TabsTrigger value="media">
             <Images className="h-4 w-4" /> Sfeerbeelden
@@ -460,6 +470,16 @@ export default async function CompanyDetailPage({
           <CompanyAddressesPanel
             companyId={id}
             addresses={(addresses ?? []) as CompanyAddress[]}
+          />
+        </TabsContent>
+
+        {/* JamesPRO */}
+        <TabsContent value="jamespro" className="mt-4">
+          <CompanyJamespro
+            companyId={id}
+            companyName={company.name}
+            linkedId={company.jamespro_company_id ?? null}
+            connected={jamesproConnected}
           />
         </TabsContent>
 
