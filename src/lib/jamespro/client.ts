@@ -133,6 +133,19 @@ export async function jamesproGetProject(
   return body ?? null;
 }
 
+export async function jamesproUpdateProject(
+  creds: JamesproCreds,
+  id: number,
+  payload: {
+    name?: string;
+    briefing?: string;
+    date?: string;
+    user_id?: number | null;
+  },
+): Promise<void> {
+  await jamespro(creds, "PUT", `/project/${id}`, payload);
+}
+
 export async function jamesproCreateProject(
   creds: JamesproCreds,
   payload: {

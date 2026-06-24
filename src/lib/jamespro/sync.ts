@@ -4,6 +4,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import {
   jamesproCreateProject,
+  jamesproUpdateProject,
   jamesproCreateTask,
   jamesproGetProject,
   type JamesproCreds,
@@ -165,20 +166,24 @@ export async function processOrderSync(
         ? integration.default_user_id
         : null;
 
-    const project = await jamesproCreateProject(creds, {
-      // The project title must be a short, plain-text line (no HTML).
-      name: stripHtml(
-        renderTemplate(
-          integration.project_title_template ||
-            DEFAULT_TEMPLATES.project_title_template,
-          tokens,
-        ),
-      ).slice(0, 200),
-      briefing: renderTemplate(
-        integration.project_briefing_template ||
-          DEFAULT_TEMPLATES.project_briefing_template,
+    const titleText = stripHtml(
+      renderTemplate(
+        integration.project_title_template ||
+          DEFAULT_TEMPLATES.project_title_template,
         tokens,
       ),
+    ).slice(0, 200);
+    const briefingHtml = renderTemplate(
+      integration.project_briefing_template ||
+        DEFAULT_TEMPLATES.project_briefing_template,
+      tokens,
+    );
+
+    // Create with ONLY the name. Sending `briefing` on create makes JamesPRO
+    // store it as the project name (and breaks the relation when `date` is
+    // present), so the description + date are applied via a follow-up update.
+    const project = await jamesproCreateProject(creds, {
+      name: titleText,
       user_id: configured,
       company_id: company.jamespro_company_id,
     });
@@ -204,6 +209,18 @@ export async function processOrderSync(
         );
       }
     }
+    // Now set the briefing (description) + date via update — these are stored
+    // correctly via PUT, unlike on create.
+    try {
+      await jamesproUpdateProject(creds, project.id, {
+        name: titleText,
+        briefing: briefingHtml,
+        date: new Date().toISOString().slice(0, 10),
+      });
+    } catch {
+      // non-fatal: the project already exists on the right relation
+    }
+
     // Mirror the project's actual assignee (PM) onto the task so they match.
     const taskAssignee =
       verify.user_id && verify.user_id > 0 ? verify.user_id : configured;
