@@ -38,6 +38,7 @@ import type { BudgetMode } from "@/lib/allowance";
 import { getIntegration } from "@/lib/jamespro/sync";
 import { CompanyMedia } from "./company-media";
 import { CompanyJamespro } from "./company-jamespro";
+import { UserSizesDialog, type SizeSet } from "@/components/user-sizes-dialog";
 import { formatPrice } from "@/lib/format";
 import {
   createCompanyUser,
@@ -82,6 +83,7 @@ export default async function CompanyDetailPage({
     { data: allotments },
     { data: media },
     { data: addresses },
+    { data: sizeSets },
   ] = await Promise.all([
     admin
       .from("products")
@@ -97,7 +99,7 @@ export default async function CompanyDetailPage({
       .order("name"),
     admin
       .from("profiles")
-      .select("id, full_name, email, status, role:roles(name)")
+      .select("id, full_name, email, status, sizes, role:roles(name)")
       .eq("company_id", id)
       .order("created_at", { ascending: false }),
     admin
@@ -125,6 +127,11 @@ export default async function CompanyDetailPage({
       .eq("company_id", id)
       .order("is_default", { ascending: false })
       .order("sort_order"),
+    admin
+      .from("option_sets")
+      .select("id, name, values:option_values(id, value, label, sort_order)")
+      .eq("kind", "size")
+      .order("name"),
   ]);
 
   const productList = products ?? [];
@@ -324,10 +331,20 @@ export default async function CompanyDetailPage({
                         <p className="font-medium">{u.full_name ?? u.email}</p>
                         <p className="text-xs text-muted-foreground">{u.email}</p>
                       </div>
-                      <Badge variant="secondary">
-                        {(u.role as unknown as { name: string } | null)?.name ??
-                          "Geen rol"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <UserSizesDialog
+                          userId={u.id}
+                          userName={u.full_name ?? u.email ?? "Gebruiker"}
+                          sizeSets={(sizeSets ?? []) as unknown as SizeSet[]}
+                          current={
+                            (u.sizes as Record<string, string> | null) ?? {}
+                          }
+                        />
+                        <Badge variant="secondary">
+                          {(u.role as unknown as { name: string } | null)
+                            ?.name ?? "Geen rol"}
+                        </Badge>
+                      </div>
                     </li>
                   ))}
                 </ul>

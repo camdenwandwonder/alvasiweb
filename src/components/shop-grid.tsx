@@ -33,12 +33,14 @@ export function ShopGrid({
   canOrder,
   mode = "euro",
   perProduct,
+  preferredSizes = [],
 }: {
   products: ShopProduct[];
   categories: { id: string; name: string }[];
   canOrder: boolean;
   mode?: BudgetMode;
   perProduct?: Record<string, { max: number; used: number; remaining: number }>;
+  preferredSizes?: string[];
 }) {
   function priceLabel(p: ShopProduct): React.ReactNode {
     if (mode === "credits")
@@ -167,6 +169,7 @@ export function ShopGrid({
                         null
                       }
                       variants={p.variants ?? []}
+                      preferredSizes={preferredSizes}
                     />
                   </div>
                 ) : null}

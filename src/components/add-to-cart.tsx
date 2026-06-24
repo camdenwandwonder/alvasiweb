@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,16 +21,31 @@ export function AddToCart({
   basePrice,
   image,
   variants,
+  preferredSizes = [],
 }: {
   productId: string;
   name: string;
   basePrice: number | null;
   image: string | null;
   variants: Variant[];
+  preferredSizes?: string[];
 }) {
   const cart = useCart();
   const [variantId, setVariantId] = useState("");
   const [qty, setQty] = useState(1);
+
+  // Pre-select the variant matching the member's saved size, so they don't
+  // have to pick it every time.
+  useEffect(() => {
+    if (variantId || !preferredSizes.length || !variants.length) return;
+    const match = variants.find((v) =>
+      Object.values(v.attributes).some((val) =>
+        preferredSizes.includes(String(val)),
+      ),
+    );
+    if (match) setVariantId(match.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function add() {
     if (variants.length && !variantId) {

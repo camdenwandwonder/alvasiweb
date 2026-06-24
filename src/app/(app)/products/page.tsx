@@ -23,16 +23,36 @@ export default async function ProductsPage() {
   const user = await getCurrentUser();
   const supabase = await createClient();
 
-  const [{ data }, allowance] = await Promise.all([
-    supabase
-      .from("products")
-      .select(
-        "id, name, description, base_price, credit_cost, category_id, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
-      )
-      .eq("status", "active")
-      .order("name"),
-    getAllowance(user),
-  ]);
+  const [{ data }, allowance, { data: profile }, { data: sizeSets }] =
+    await Promise.all([
+      supabase
+        .from("products")
+        .select(
+          "id, name, description, base_price, credit_cost, category_id, category:categories(name), variants:product_variants(id, attributes, price_override), images:product_images(url, is_primary)",
+        )
+        .eq("status", "active")
+        .order("name"),
+      getAllowance(user),
+      supabase.from("profiles").select("sizes").eq("id", user?.id ?? "").maybeSingle(),
+      supabase
+        .from("option_sets")
+        .select("id, values:option_values(value, label)")
+        .eq("kind", "size"),
+    ]);
+
+  // The member's preferred size values/labels — used to pre-select variants.
+  const userSizes = (profile?.sizes as Record<string, string>) ?? {};
+  const preferred = new Set<string>();
+  for (const [setId, val] of Object.entries(userSizes)) {
+    if (!val) continue;
+    preferred.add(String(val));
+    const set = (sizeSets ?? []).find((s) => s.id === setId) as
+      | { values: { value: string; label: string | null }[] }
+      | undefined;
+    const ov = set?.values?.find((v) => v.value === val);
+    if (ov?.label) preferred.add(ov.label);
+  }
+  const preferredSizes = [...preferred];
 
   let raw = (data ?? []) as unknown as Raw[];
 
@@ -88,6 +108,7 @@ export default async function ProductsPage() {
         canOrder={can(user, "orders.create")}
         mode={allowance.mode}
         perProduct={allowance.perProduct}
+        preferredSizes={preferredSizes}
       />
     </div>
   );

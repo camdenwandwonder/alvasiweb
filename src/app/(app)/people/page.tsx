@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState, NativeSelect } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
 import { NewUserDialog } from "./new-user-dialog";
+import { UserSizesDialog, type SizeSet } from "@/components/user-sizes-dialog";
 import { updateUserRole, setUserStatus } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ type Person = {
   email: string | null;
   status: string;
   role_id: string | null;
+  sizes: Record<string, string> | null;
 };
 
 export default async function PeoplePage() {
@@ -24,18 +26,25 @@ export default async function PeoplePage() {
   if (!can(user, "users.view")) redirect("/dashboard");
   const supabase = await createClient();
 
-  const [{ data: people }, { data: roles }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, full_name, email, status, role_id")
-      .eq("company_id", user!.companyId!)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("roles")
-      .select("id, name")
-      .eq("company_id", user!.companyId!)
-      .order("name"),
-  ]);
+  const [{ data: people }, { data: roles }, { data: sizeSets }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, full_name, email, status, role_id, sizes")
+        .eq("company_id", user!.companyId!)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("roles")
+        .select("id, name")
+        .eq("company_id", user!.companyId!)
+        .order("name"),
+      supabase
+        .from("option_sets")
+        .select("id, name, values:option_values(id, value, label, sort_order)")
+        .eq("kind", "size")
+        .order("name"),
+    ]);
+  const sizeSetList = (sizeSets ?? []) as unknown as SizeSet[];
 
   const canManage = can(user, "users.update");
   const roleList = roles ?? [];
@@ -78,6 +87,12 @@ export default async function PeoplePage() {
 
               {canManage ? (
                 <div className="flex items-center gap-2">
+                  <UserSizesDialog
+                    userId={p.id}
+                    userName={p.full_name ?? p.email ?? "Gebruiker"}
+                    sizeSets={sizeSetList}
+                    current={p.sizes ?? {}}
+                  />
                   <form
                     action={updateUserRole.bind(null, p.id)}
                     className="flex items-center gap-2"
