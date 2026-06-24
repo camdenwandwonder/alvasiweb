@@ -74,9 +74,12 @@ export function JamesproSettings({
     startTransition(async () => {
       const res = await testSendOrderToJamespro(testOrderId);
       if (res.ok) {
-        const msg = `Gelukt! Project #${res.projectId} en taak #${res.taskId} aangemaakt in JamesPRO.`;
+        const msg = `Gelukt! Project #${res.projectId} en taak #${res.taskId} aangemaakt in JamesPRO.${
+          res.warning ? ` ⚠️ ${res.warning}` : ""
+        }`;
         setTestResult(msg);
-        toast.success(msg);
+        if (res.warning) toast.warning(res.warning);
+        else toast.success(msg);
       } else {
         setTestResult(res.error ?? "Mislukt");
         toast.error(res.error ?? "Mislukt");

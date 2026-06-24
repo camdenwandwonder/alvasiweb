@@ -101,7 +101,7 @@ async function markSync(
 export async function processOrderSync(
   orderId: string,
   opts?: { force?: boolean },
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; warning?: string }> {
   const admin = createAdminClient();
 
   try {
@@ -233,15 +233,19 @@ export async function processOrderSync(
     // overwritten by any extra text field on create/update and writing
     // `briefing` never populates the briefing editor, so a note is the only
     // reliable place for the description.
+    let noteWarning: string | undefined;
     try {
       await jamesproCreateNote(creds, {
         content: htmlToText(briefingHtml),
         parent_type: "project",
         parent_id: project.id,
-        user_id: taskAssignee,
+        date: new Date().toISOString().slice(0, 19).replace("T", " "),
+        ...(taskAssignee ? { user_id: taskAssignee } : {}),
       });
-    } catch {
-      // non-fatal
+    } catch (e) {
+      noteWarning = `Project en taak aangemaakt, maar de omschrijving (notitie) is mislukt: ${
+        e instanceof Error ? e.message : "onbekende fout"
+      }`;
     }
 
     const task = await jamesproCreateTask(creds, {
@@ -273,7 +277,7 @@ export async function processOrderSync(
       },
       true,
     );
-    return { ok: true };
+    return { ok: true, warning: noteWarning };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Onbekende fout";
     await markSync(orderId, { status: "error", last_error: error }, true);

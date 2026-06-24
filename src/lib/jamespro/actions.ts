@@ -233,9 +233,13 @@ export async function retryOrderSync(orderId: string): Promise<void> {
  * Test the integration by sending a chosen order to JamesPRO now. Really
  * creates a project + task (so pick a safe test order). Returns the ids.
  */
-export async function testSendOrderToJamespro(
-  orderId: string,
-): Promise<{ ok: boolean; error?: string; projectId?: number; taskId?: number }> {
+export async function testSendOrderToJamespro(orderId: string): Promise<{
+  ok: boolean;
+  error?: string;
+  warning?: string;
+  projectId?: number;
+  taskId?: number;
+}> {
   await requireSuperadmin();
   if (!orderId) return { ok: false, error: "Kies eerst een bestelling." };
   const res = await processOrderSync(orderId, { force: true });
@@ -249,6 +253,7 @@ export async function testSendOrderToJamespro(
   revalidatePath(`/admin/orders/${orderId}`);
   return {
     ok: true,
+    warning: res.warning,
     projectId: data?.jamespro_project_id ?? undefined,
     taskId: data?.jamespro_task_id ?? undefined,
   };
