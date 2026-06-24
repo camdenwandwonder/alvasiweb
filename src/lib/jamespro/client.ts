@@ -118,12 +118,18 @@ export async function jamesproCreateCompany(
 export async function jamesproGetProject(
   creds: JamesproCreds,
   id: number,
-): Promise<{ id: number; user_id?: number } | null> {
-  const { body } = await jamespro<{ id: number; user_id?: number }>(
-    creds,
-    "GET",
-    `/project/${id}`,
-  );
+): Promise<{
+  id: number;
+  name?: string;
+  user_id?: number;
+  company_id?: number;
+} | null> {
+  const { body } = await jamespro<{
+    id: number;
+    name?: string;
+    user_id?: number;
+    company_id?: number;
+  }>(creds, "GET", `/project/${id}`);
   return body ?? null;
 }
 

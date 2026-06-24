@@ -156,7 +156,6 @@ export async function processOrderSync(
       secret: integration.auth_secret,
     };
 
-    const today = new Date().toISOString().slice(0, 10);
     // Assignee: a real (positive) configured id, else explicit null. Null makes
     // JamesPRO auto-assign the connected API user (and keeps the project visible
     // in the project lists). Sending 0, or omitting the field entirely, orphans
@@ -182,19 +181,32 @@ export async function processOrderSync(
       ),
       user_id: configured,
       company_id: company.jamespro_company_id,
-      contact_id: company.jamespro_contact_id ?? undefined,
-      date: today,
     });
 
-    // Mirror the project's actual assignee (PM) onto the task so they match,
-    // even when JamesPRO auto-assigned it.
-    let taskAssignee = configured;
-    try {
-      const full = await jamesproGetProject(creds, project.id);
-      if (full?.user_id && full.user_id > 0) taskAssignee = full.user_id;
-    } catch {
-      // non-fatal
+    // Verify the project actually persisted on the intended relation. JamesPRO
+    // returns an id even when a create only partially succeeds, so we read it
+    // back and fail loudly rather than reporting a false success.
+    const verify = await jamesproGetProject(creds, project.id);
+    if (!verify) {
+      throw new Error(
+        `Project #${project.id} kon niet worden teruggevonden in JamesPRO — aanmaken is niet voltooid.`,
+      );
     }
+    if (company.jamespro_company_id) {
+      if (!verify.company_id) {
+        throw new Error(
+          `Project #${project.id} is zonder relatie aangemaakt in JamesPRO (verwacht relatie #${company.jamespro_company_id}). Daarom verschijnt het niet onder het bedrijf.`,
+        );
+      }
+      if (verify.company_id !== company.jamespro_company_id) {
+        throw new Error(
+          `Project is op de verkeerde relatie aangemaakt (#${verify.company_id} i.p.v. #${company.jamespro_company_id}).`,
+        );
+      }
+    }
+    // Mirror the project's actual assignee (PM) onto the task so they match.
+    const taskAssignee =
+      verify.user_id && verify.user_id > 0 ? verify.user_id : configured;
 
     const task = await jamesproCreateTask(creds, {
       description: stripHtml(
@@ -213,7 +225,6 @@ export async function processOrderSync(
       user_id: taskAssignee,
       project_id: project.id,
       status: 0,
-      date: today,
     });
 
     await markSync(
