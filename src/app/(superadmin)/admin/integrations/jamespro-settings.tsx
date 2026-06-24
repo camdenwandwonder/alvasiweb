@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -28,7 +28,6 @@ import {
   disconnectJamespro,
   saveJamesproSettings,
   testSendOrderToJamespro,
-  listJamesproUsers,
 } from "@/lib/jamespro/actions";
 
 type TestOrder = { id: string; label: string };
@@ -57,52 +56,18 @@ export function JamesproSettings({
   const [testOrderId, setTestOrderId] = useState("");
   const [testResult, setTestResult] = useState<string | null>(null);
 
-  // Assignee picker. JamesPRO has no users API, so we seed with the connected
-  // user (always known) and enrich with ids found on projects.
-  const MANUAL = "__manual__";
-  const [users, setUsers] = useState<{ id: number; label: string }[]>(
-    integration.connectedUser
-      ? [
-          {
-            id: integration.connectedUser.id,
-            label: `${integration.connectedUser.name} (#${integration.connectedUser.id})`,
-          },
-        ]
-      : [],
-  );
-  const [assignee, setAssignee] = useState<string>(
-    integration.defaultUserId != null
-      ? String(integration.defaultUserId)
-      : integration.connectedUser
-        ? String(integration.connectedUser.id)
-        : "",
+  // Assignee. JamesPRO exposes no users list via the API, so the default
+  // ("standaard") lets JamesPRO assign the connected account; a specific id can
+  // be entered for another employee.
+  const hasConfiguredId =
+    integration.defaultUserId != null && integration.defaultUserId > 0;
+  const [assigneeMode, setAssigneeMode] = useState<"default" | "manual">(
+    hasConfiguredId ? "manual" : "default",
   );
   const [manualId, setManualId] = useState(
-    integration.defaultUserId?.toString() ?? "",
+    hasConfiguredId ? String(integration.defaultUserId) : "",
   );
-
-  useEffect(() => {
-    if (!integration.connected) return;
-    listJamesproUsers().then((res) => {
-      if (!res.ok || !res.users) return;
-      const opts = res.users.map((u) => ({
-        id: u.id,
-        label: u.name.startsWith("Gebruiker #")
-          ? u.name
-          : `${u.name} (#${u.id})`,
-      }));
-      setUsers(opts);
-      if (
-        integration.defaultUserId != null &&
-        !opts.some((o) => o.id === integration.defaultUserId)
-      ) {
-        setAssignee(MANUAL);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const assigneeValue = assignee === MANUAL ? manualId : assignee;
+  const assigneeValue = assigneeMode === "manual" ? manualId : "";
 
   function sendTest() {
     setTestResult(null);
@@ -291,23 +256,22 @@ export function JamesproSettings({
 
             <Field
               label="Toegewezen JamesPRO-gebruiker"
-              hint="De medewerker aan wie alle projecten en taken worden toegewezen."
+              hint="JamesPRO biedt geen namenlijst via de API. Met 'Standaard' wijst JamesPRO toe aan het gekoppelde account; de taak krijgt automatisch dezelfde persoon als het project. Kies 'Specifieke gebruiker' om naar een ander te wijzen via diens ID."
             >
               <input type="hidden" name="default_user_id" value={assigneeValue} />
               <NativeSelect
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
+                value={assigneeMode}
+                onChange={(e) =>
+                  setAssigneeMode(e.target.value as "default" | "manual")
+                }
                 className="max-w-md"
               >
-                <option value="">Niet toegewezen</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.label}
-                  </option>
-                ))}
-                <option value={MANUAL}>Andere gebruiker (ID invoeren)…</option>
+                <option value="default">
+                  Standaard — gekoppelde JamesPRO-gebruiker (aanbevolen)
+                </option>
+                <option value="manual">Specifieke gebruiker (ID invoeren)…</option>
               </NativeSelect>
-              {assignee === MANUAL ? (
+              {assigneeMode === "manual" ? (
                 <Input
                   type="number"
                   value={manualId}

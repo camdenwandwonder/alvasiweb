@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import {
   jamesproCreateProject,
   jamesproCreateTask,
+  jamesproGetProject,
   type JamesproCreds,
 } from "./client";
 import {
@@ -156,10 +157,13 @@ export async function processOrderSync(
     };
 
     const today = new Date().toISOString().slice(0, 10);
-    // Assignee: configured user, else the connected API user, so the project
-    // and its task always go to the same person.
-    const assignee =
-      integration.default_user_id ?? integration.connected_user?.id ?? null;
+    // Only send a configured assignee when it's a real (positive) id. Sending
+    // user_id: 0 orphans the project to a non-existent user (invisible in
+    // JamesPRO). When omitted, JamesPRO auto-assigns the connected account.
+    const configured =
+      integration.default_user_id && integration.default_user_id > 0
+        ? integration.default_user_id
+        : undefined;
 
     const project = await jamesproCreateProject(creds, {
       // The project title must be a short, plain-text line (no HTML).
@@ -175,11 +179,21 @@ export async function processOrderSync(
           DEFAULT_TEMPLATES.project_briefing_template,
         tokens,
       ),
-      user_id: assignee,
+      user_id: configured,
       company_id: company.jamespro_company_id,
       contact_id: company.jamespro_contact_id ?? undefined,
       date: today,
     });
+
+    // Mirror the project's actual assignee (PM) onto the task so they match,
+    // even when JamesPRO auto-assigned it.
+    let taskAssignee = configured;
+    try {
+      const full = await jamesproGetProject(creds, project.id);
+      if (full?.user_id && full.user_id > 0) taskAssignee = full.user_id;
+    } catch {
+      // non-fatal
+    }
 
     const task = await jamesproCreateTask(creds, {
       description: stripHtml(
@@ -195,7 +209,7 @@ export async function processOrderSync(
           tokens,
         ),
       ),
-      user_id: assignee,
+      user_id: taskAssignee,
       project_id: project.id,
       status: 0,
       date: today,

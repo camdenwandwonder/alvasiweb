@@ -115,6 +115,18 @@ export async function jamesproCreateCompany(
   return body;
 }
 
+export async function jamesproGetProject(
+  creds: JamesproCreds,
+  id: number,
+): Promise<{ id: number; user_id?: number } | null> {
+  const { body } = await jamespro<{ id: number; user_id?: number }>(
+    creds,
+    "GET",
+    `/project/${id}`,
+  );
+  return body ?? null;
+}
+
 export async function jamesproCreateProject(
   creds: JamesproCreds,
   payload: {
