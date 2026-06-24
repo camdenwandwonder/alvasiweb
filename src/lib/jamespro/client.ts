@@ -150,11 +150,12 @@ export async function jamesproCreateProject(
   creds: JamesproCreds,
   payload: {
     name: string;
-    briefing?: string;
+    // NB: JamesPRO renamed these fields from the published docs.
+    description?: string; // was `briefing` — the rich-text description editor
+    date_created?: string; // was `date` — the project creation date
     user_id?: number | null;
     company_id?: number | null;
     contact_id?: number | null;
-    date?: string;
     deadline?: string;
   },
 ): Promise<{ id: number }> {

@@ -4,7 +4,6 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import {
   jamesproCreateProject,
-  jamesproCreateNote,
   jamesproCreateTask,
   jamesproGetProject,
   type JamesproCreds,
@@ -49,22 +48,6 @@ function stripHtml(s: string): string {
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Convert briefing HTML to readable multi-line plain text (for a note). */
-function htmlToText(s: string): string {
-  return s
-    .replace(/<\/(p|div|h[1-6])>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<li>/gi, "• ")
-    .replace(/<\/li>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]*\n[ \t]*/g, "\n")
     .trim();
 }
 
@@ -195,11 +178,13 @@ export async function processOrderSync(
       tokens,
     );
 
-    // Create with ONLY the name. Sending `briefing` on create makes JamesPRO
-    // store it as the project name (and breaks the relation when `date` is
-    // present), so the description + date are applied via a follow-up update.
+    // JamesPRO renamed the documented fields: `briefing` -> `description`,
+    // `date` -> `date_created`. With the correct names the description editor
+    // and project date populate properly (the old names corrupted the name).
     const project = await jamesproCreateProject(creds, {
       name: titleText,
+      description: briefingHtml,
+      date_created: new Date().toISOString().slice(0, 10),
       user_id: configured,
       company_id: company.jamespro_company_id,
     });
@@ -228,25 +213,6 @@ export async function processOrderSync(
     // Mirror the project's actual assignee (PM) onto the task so they match.
     const taskAssignee =
       verify.user_id && verify.user_id > 0 ? verify.user_id : configured;
-
-    // The order details go in a project NOTE: JamesPRO's project `name` is
-    // overwritten by any extra text field on create/update and writing
-    // `briefing` never populates the briefing editor, so a note is the only
-    // reliable place for the description.
-    let noteWarning: string | undefined;
-    try {
-      await jamesproCreateNote(creds, {
-        content: htmlToText(briefingHtml),
-        parent_type: "project",
-        parent_id: project.id,
-        date: new Date().toISOString().slice(0, 19).replace("T", " "),
-        ...(taskAssignee ? { user_id: taskAssignee } : {}),
-      });
-    } catch (e) {
-      noteWarning = `Project en taak aangemaakt, maar de omschrijving (notitie) is mislukt: ${
-        e instanceof Error ? e.message : "onbekende fout"
-      }`;
-    }
 
     const task = await jamesproCreateTask(creds, {
       description: stripHtml(
@@ -277,7 +243,7 @@ export async function processOrderSync(
       },
       true,
     );
-    return { ok: true, warning: noteWarning };
+    return { ok: true };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Onbekende fout";
     await markSync(orderId, { status: "error", last_error: error }, true);
