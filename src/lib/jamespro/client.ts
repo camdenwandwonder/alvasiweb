@@ -86,12 +86,19 @@ export async function jamesproSearchCompanies(
   creds: JamesproCreds,
   name: string,
 ): Promise<JamesproCompany[]> {
-  const { body } = await jamespro<JamesproCompany[]>(
-    creds,
-    "GET",
-    `/companies/?filter[name]=${encodeURIComponent(name)}&limit=25`,
-  );
-  return Array.isArray(body) ? body : [];
+  // JamesPRO's filter[name] matches with LIKE against the given value, so a
+  // bare term only matches an exact name. Wrap it in wildcards for partial
+  // matches (like the JamesPRO UI); fall back to the literal term if needed.
+  const attempts = [`%${name}%`, name];
+  for (const term of attempts) {
+    const { body } = await jamespro<JamesproCompany[]>(
+      creds,
+      "GET",
+      `/companies/?filter[name]=${encodeURIComponent(term)}&limit=25`,
+    );
+    if (Array.isArray(body) && body.length > 0) return body;
+  }
+  return [];
 }
 
 export async function jamesproCreateCompany(
