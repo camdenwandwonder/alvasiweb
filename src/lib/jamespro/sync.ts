@@ -82,15 +82,21 @@ async function markSync(
  */
 export async function processOrderSync(
   orderId: string,
+  opts?: { force?: boolean },
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = createAdminClient();
 
   try {
     const integration = await getIntegration();
-    if (!integration?.enabled || !integration.auth_key || !integration.auth_secret) {
-      const error = "JamesPRO-koppeling staat uit of is niet verbonden.";
-      await markSync(orderId, { status: "error", last_error: error });
+    if (!integration?.auth_key || !integration.auth_secret) {
+      const error = "JamesPRO is niet verbonden.";
+      if (opts?.force) await markSync(orderId, { status: "error", last_error: error });
       return { ok: false, error };
+    }
+    // The enabled toggle only gates automatic syncing; a manual test (force)
+    // works regardless so you can verify before going live.
+    if (!integration.enabled && !opts?.force) {
+      return { ok: false, error: "Koppeling staat uit." };
     }
 
     const { data: order } = await admin

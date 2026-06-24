@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import {
+  jamespro,
   jamesproAuth,
   jamesproMe,
   jamesproSearchCompanies,
@@ -76,6 +77,46 @@ export async function testJamesproConnection(): Promise<{
     return { ok: true, user: me.name };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Test mislukt" };
+  }
+}
+
+/**
+ * Best-effort list of assignable JamesPRO users for the assignee picker.
+ * JamesPRO has no users endpoint, so we name the connected API user and add any
+ * distinct user_ids found on recent projects (labelled by id when unknown).
+ */
+export async function listJamesproUsers(): Promise<{
+  ok: boolean;
+  users?: { id: number; name: string }[];
+  error?: string;
+}> {
+  await requireSuperadmin();
+  try {
+    const c = await creds();
+    const me = await jamesproMe(c);
+    const map = new Map<number, string>();
+    map.set(me.id, me.name);
+    try {
+      const { body } = await jamespro<{ user_id?: number }[]>(
+        c,
+        "GET",
+        "/projects/?limit=200",
+      );
+      if (Array.isArray(body)) {
+        for (const p of body) {
+          const uid = p.user_id;
+          if (uid && !map.has(uid)) map.set(uid, `Gebruiker #${uid}`);
+        }
+      }
+    } catch {
+      // projects scan is optional
+    }
+    return {
+      ok: true,
+      users: [...map.entries()].map(([id, name]) => ({ id, name })),
+    };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Mislukt" };
   }
 }
 
@@ -197,7 +238,7 @@ export async function testSendOrderToJamespro(
 ): Promise<{ ok: boolean; error?: string; projectId?: number; taskId?: number }> {
   await requireSuperadmin();
   if (!orderId) return { ok: false, error: "Kies eerst een bestelling." };
-  const res = await processOrderSync(orderId);
+  const res = await processOrderSync(orderId, { force: true });
   if (!res.ok) return { ok: false, error: res.error };
   const admin = createAdminClient();
   const { data } = await admin

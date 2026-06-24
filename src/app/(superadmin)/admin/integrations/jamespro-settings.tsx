@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -28,6 +28,7 @@ import {
   disconnectJamespro,
   saveJamesproSettings,
   testSendOrderToJamespro,
+  listJamesproUsers,
 } from "@/lib/jamespro/actions";
 
 type TestOrder = { id: string; label: string };
@@ -55,6 +56,53 @@ export function JamesproSettings({
   const [pending, startTransition] = useTransition();
   const [testOrderId, setTestOrderId] = useState("");
   const [testResult, setTestResult] = useState<string | null>(null);
+
+  // Assignee picker. JamesPRO has no users API, so we seed with the connected
+  // user (always known) and enrich with ids found on projects.
+  const MANUAL = "__manual__";
+  const [users, setUsers] = useState<{ id: number; label: string }[]>(
+    integration.connectedUser
+      ? [
+          {
+            id: integration.connectedUser.id,
+            label: `${integration.connectedUser.name} (#${integration.connectedUser.id})`,
+          },
+        ]
+      : [],
+  );
+  const [assignee, setAssignee] = useState<string>(
+    integration.defaultUserId != null
+      ? String(integration.defaultUserId)
+      : integration.connectedUser
+        ? String(integration.connectedUser.id)
+        : "",
+  );
+  const [manualId, setManualId] = useState(
+    integration.defaultUserId?.toString() ?? "",
+  );
+
+  useEffect(() => {
+    if (!integration.connected) return;
+    listJamesproUsers().then((res) => {
+      if (!res.ok || !res.users) return;
+      const opts = res.users.map((u) => ({
+        id: u.id,
+        label: u.name.startsWith("Gebruiker #")
+          ? u.name
+          : `${u.name} (#${u.id})`,
+      }));
+      setUsers(opts);
+      if (
+        integration.defaultUserId != null &&
+        !opts.some((o) => o.id === integration.defaultUserId)
+      ) {
+        setAssignee(MANUAL);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const assigneeValue = assignee === MANUAL ? manualId : assignee;
 
   function sendTest() {
     setTestResult(null);
@@ -242,15 +290,32 @@ export function JamesproSettings({
             </label>
 
             <Field
-              label="Toegewezen JamesPRO-gebruiker (user_id)"
-              hint="Het ID van de medewerker aan wie alle projecten/taken worden toegewezen. Te vinden in JamesPRO."
+              label="Toegewezen JamesPRO-gebruiker"
+              hint="De medewerker aan wie alle projecten en taken worden toegewezen."
             >
-              <Input
-                name="default_user_id"
-                type="number"
-                defaultValue={integration.defaultUserId ?? ""}
-                className="w-40"
-              />
+              <input type="hidden" name="default_user_id" value={assigneeValue} />
+              <NativeSelect
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+                className="max-w-md"
+              >
+                <option value="">Niet toegewezen</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.label}
+                  </option>
+                ))}
+                <option value={MANUAL}>Andere gebruiker (ID invoeren)…</option>
+              </NativeSelect>
+              {assignee === MANUAL ? (
+                <Input
+                  type="number"
+                  value={manualId}
+                  onChange={(e) => setManualId(e.target.value)}
+                  placeholder="user_id"
+                  className="mt-2 w-40"
+                />
+              ) : null}
             </Field>
 
             <div className="rounded-lg border bg-muted/40 p-3">
