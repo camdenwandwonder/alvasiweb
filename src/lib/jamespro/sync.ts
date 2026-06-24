@@ -157,13 +157,14 @@ export async function processOrderSync(
     };
 
     const today = new Date().toISOString().slice(0, 10);
-    // Only send a configured assignee when it's a real (positive) id. Sending
-    // user_id: 0 orphans the project to a non-existent user (invisible in
-    // JamesPRO). When omitted, JamesPRO auto-assigns the connected account.
+    // Assignee: a real (positive) configured id, else explicit null. Null makes
+    // JamesPRO auto-assign the connected API user (and keeps the project visible
+    // in the project lists). Sending 0, or omitting the field entirely, orphans
+    // the project so it never shows up.
     const configured =
       integration.default_user_id && integration.default_user_id > 0
         ? integration.default_user_id
-        : undefined;
+        : null;
 
     const project = await jamesproCreateProject(creds, {
       // The project title must be a short, plain-text line (no HTML).
