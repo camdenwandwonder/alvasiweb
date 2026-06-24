@@ -168,6 +168,19 @@ export async function jamesproCreateProject(
   return body;
 }
 
+export async function jamesproCreateNote(
+  creds: JamesproCreds,
+  payload: {
+    content: string;
+    parent_type: "project" | "offer" | "invoice" | "company";
+    parent_id: number;
+    user_id?: number | null;
+    date?: string;
+  },
+): Promise<void> {
+  await jamespro(creds, "POST", "/note", payload);
+}
+
 export async function jamesproCreateTask(
   creds: JamesproCreds,
   payload: {

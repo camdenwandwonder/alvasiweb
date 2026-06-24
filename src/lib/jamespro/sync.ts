@@ -4,7 +4,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import {
   jamesproCreateProject,
-  jamesproUpdateProject,
+  jamesproCreateNote,
   jamesproCreateTask,
   jamesproGetProject,
   type JamesproCreds,
@@ -49,6 +49,22 @@ function stripHtml(s: string): string {
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Convert briefing HTML to readable multi-line plain text (for a note). */
+function htmlToText(s: string): string {
+  return s
+    .replace(/<\/(p|div|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li>/gi, "• ")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]*\n[ \t]*/g, "\n")
     .trim();
 }
 
@@ -209,21 +225,24 @@ export async function processOrderSync(
         );
       }
     }
-    // Now set the briefing (description) + date via update — these are stored
-    // correctly via PUT, unlike on create.
-    try {
-      await jamesproUpdateProject(creds, project.id, {
-        name: titleText,
-        briefing: briefingHtml,
-        date: new Date().toISOString().slice(0, 10),
-      });
-    } catch {
-      // non-fatal: the project already exists on the right relation
-    }
-
     // Mirror the project's actual assignee (PM) onto the task so they match.
     const taskAssignee =
       verify.user_id && verify.user_id > 0 ? verify.user_id : configured;
+
+    // The order details go in a project NOTE: JamesPRO's project `name` is
+    // overwritten by any extra text field on create/update and writing
+    // `briefing` never populates the briefing editor, so a note is the only
+    // reliable place for the description.
+    try {
+      await jamesproCreateNote(creds, {
+        content: htmlToText(briefingHtml),
+        parent_type: "project",
+        parent_id: project.id,
+        user_id: taskAssignee,
+      });
+    } catch {
+      // non-fatal
+    }
 
     const task = await jamesproCreateTask(creds, {
       description: stripHtml(
