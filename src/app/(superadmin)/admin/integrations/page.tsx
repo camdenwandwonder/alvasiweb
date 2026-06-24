@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/user";
+import { createAdminClient } from "@/lib/supabase/server";
 import { getIntegration } from "@/lib/jamespro/sync";
 import { PageHeader } from "@/components/primitives";
 import { JamesproSettings } from "./jamespro-settings";
@@ -11,6 +12,19 @@ export default async function IntegrationsPage() {
   if (!user?.isSuperadmin) redirect("/admin");
 
   const i = await getIntegration();
+
+  // Recent orders for the manual test selector.
+  const { data: orders } = await createAdminClient()
+    .from("orders")
+    .select("id, order_number, created_at, company:companies(name)")
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const testOrders = (orders ?? []).map((o) => ({
+    id: o.id as string,
+    label: `${o.order_number ?? "Bestelling"} — ${
+      (o.company as unknown as { name: string } | null)?.name ?? ""
+    }`,
+  }));
   // Never send secrets to the client — only connection status + config.
   const safe = {
     connected: !!(i?.auth_key && i?.auth_secret),
@@ -31,7 +45,7 @@ export default async function IntegrationsPage() {
         title="Integraties"
         description="Koppel Alvasi met JamesPRO. Bij elke goedgekeurde bestelling wordt automatisch een project en taak aangemaakt bij de juiste relatie."
       />
-      <JamesproSettings integration={safe} />
+      <JamesproSettings integration={safe} testOrders={testOrders} />
     </div>
   );
 }

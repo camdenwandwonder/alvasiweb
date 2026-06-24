@@ -2,12 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, Plug, RefreshCw, Unplug } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  Plug,
+  RefreshCw,
+  Unplug,
+  Send,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Field } from "@/components/primitives";
+import { Field, NativeSelect } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
 import {
   DEFAULT_TEMPLATES,
@@ -20,7 +27,10 @@ import {
   testJamesproConnection,
   disconnectJamespro,
   saveJamesproSettings,
+  testSendOrderToJamespro,
 } from "@/lib/jamespro/actions";
+
+type TestOrder = { id: string; label: string };
 
 type Safe = {
   connected: boolean;
@@ -35,8 +45,31 @@ type Safe = {
   taskNoteTemplate: string | null;
 };
 
-export function JamesproSettings({ integration }: { integration: Safe }) {
+export function JamesproSettings({
+  integration,
+  testOrders,
+}: {
+  integration: Safe;
+  testOrders: TestOrder[];
+}) {
   const [pending, startTransition] = useTransition();
+  const [testOrderId, setTestOrderId] = useState("");
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  function sendTest() {
+    setTestResult(null);
+    startTransition(async () => {
+      const res = await testSendOrderToJamespro(testOrderId);
+      if (res.ok) {
+        const msg = `Gelukt! Project #${res.projectId} en taak #${res.taskId} aangemaakt in JamesPRO.`;
+        setTestResult(msg);
+        toast.success(msg);
+      } else {
+        setTestResult(res.error ?? "Mislukt");
+        toast.error(res.error ?? "Mislukt");
+      }
+    });
+  }
 
   // Live-preview state for the templates.
   const [title, setTitle] = useState(
@@ -145,6 +178,50 @@ export function JamesproSettings({ integration }: { integration: Safe }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Manual test */}
+      {integration.connected ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Test met een bestelling</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Stuur een bestaande bestelling nu naar JamesPRO. Hiermee wordt
+              echt een project en taak aangemaakt op de gekoppelde relatie —
+              kies een veilige testbestelling.
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-64 flex-1">
+                <Field label="Bestelling">
+                  <NativeSelect
+                    value={testOrderId}
+                    onChange={(e) => setTestOrderId(e.target.value)}
+                  >
+                    <option value="">Kies een bestelling…</option>
+                    {testOrders.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Field>
+              </div>
+              <Button onClick={sendTest} disabled={pending || !testOrderId}>
+                {pending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Verstuur naar JamesPRO
+              </Button>
+            </div>
+            {testResult ? (
+              <p className="text-sm text-muted-foreground">{testResult}</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Settings + templates */}
       <form action={saveJamesproSettings}>
