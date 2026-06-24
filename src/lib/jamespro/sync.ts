@@ -40,6 +40,16 @@ export async function getIntegration(): Promise<Integration | null> {
   return (data as Integration | null) ?? null;
 }
 
+/** Strip HTML to a single clean plain-text line (for titles/task text). */
+function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function appUrl(): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL ?? "https://alvasiweb.vercel.app"
@@ -139,34 +149,50 @@ export async function processOrderSync(
       secret: integration.auth_secret,
     };
 
+    const today = new Date().toISOString().slice(0, 10);
+    // Assignee: configured user, else the connected API user, so the project
+    // and its task always go to the same person.
+    const assignee =
+      integration.default_user_id ?? integration.connected_user?.id ?? null;
+
     const project = await jamesproCreateProject(creds, {
-      name: renderTemplate(
-        integration.project_title_template || DEFAULT_TEMPLATES.project_title_template,
-        tokens,
-      ),
+      // The project title must be a short, plain-text line (no HTML).
+      name: stripHtml(
+        renderTemplate(
+          integration.project_title_template ||
+            DEFAULT_TEMPLATES.project_title_template,
+          tokens,
+        ),
+      ).slice(0, 200),
       briefing: renderTemplate(
         integration.project_briefing_template ||
           DEFAULT_TEMPLATES.project_briefing_template,
         tokens,
       ),
-      user_id: integration.default_user_id,
+      user_id: assignee,
       company_id: company.jamespro_company_id,
       contact_id: company.jamespro_contact_id ?? undefined,
+      date: today,
     });
 
     const task = await jamesproCreateTask(creds, {
-      description: renderTemplate(
-        integration.task_description_template ||
-          DEFAULT_TEMPLATES.task_description_template,
-        tokens,
+      description: stripHtml(
+        renderTemplate(
+          integration.task_description_template ||
+            DEFAULT_TEMPLATES.task_description_template,
+          tokens,
+        ),
+      ).slice(0, 255),
+      note: stripHtml(
+        renderTemplate(
+          integration.task_note_template || DEFAULT_TEMPLATES.task_note_template,
+          tokens,
+        ),
       ),
-      note: renderTemplate(
-        integration.task_note_template || DEFAULT_TEMPLATES.task_note_template,
-        tokens,
-      ),
-      user_id: integration.default_user_id,
+      user_id: assignee,
       project_id: project.id,
       status: 0,
+      date: today,
     });
 
     await markSync(

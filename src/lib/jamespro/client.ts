@@ -123,6 +123,7 @@ export async function jamesproCreateProject(
     user_id?: number | null;
     company_id?: number | null;
     contact_id?: number | null;
+    date?: string;
     deadline?: string;
   },
 ): Promise<{ id: number }> {
@@ -144,6 +145,7 @@ export async function jamesproCreateTask(
     user_id?: number | null;
     project_id: number;
     status?: number;
+    date?: string;
   },
 ): Promise<{ id: number }> {
   const { body } = await jamespro<{ id: number }>(
