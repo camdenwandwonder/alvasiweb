@@ -99,3 +99,20 @@ export function can(user: CurrentUser | null, permission: string): boolean {
   if (user.isSuperadmin) return true;
   return user.permissions.includes(permission);
 }
+
+const MANAGEMENT_PERMS = [
+  "orders.view_all",
+  "orders.approve",
+  "users.view",
+  "roles.manage",
+  "settings.manage",
+];
+
+/**
+ * A plain member ("personeel"): no management permissions at all. Members go
+ * straight to the Winkel and have no Start/dashboard page.
+ */
+export function isMember(user: CurrentUser | null): boolean {
+  if (!user || user.isSuperadmin) return false;
+  return !MANAGEMENT_PERMS.some((p) => user.permissions.includes(p));
+}

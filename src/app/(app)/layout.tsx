@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, can } from "@/lib/auth/user";
+import { getCurrentUser, can, isMember } from "@/lib/auth/user";
 import { AppShell } from "@/components/app-shell";
 import { CartProvider } from "@/components/cart";
 import type { SidebarNavItem } from "@/components/app-sidebar";
@@ -29,9 +29,10 @@ export default async function AppLayout({
     );
   }
 
-  const items: SidebarNavItem[] = [
-    { href: "/dashboard", label: "Start", icon: "dashboard" },
-  ];
+  // Plain members have no Start page — the Winkel is their landing page.
+  const items: SidebarNavItem[] = isMember(user)
+    ? []
+    : [{ href: "/dashboard", label: "Start", icon: "dashboard" }];
   if (can(user, "products.view"))
     items.push({ href: "/products", label: "Winkel", icon: "shop" });
   if (can(user, "orders.create"))

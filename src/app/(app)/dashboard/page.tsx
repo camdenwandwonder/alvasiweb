@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Package, ClipboardList, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, can } from "@/lib/auth/user";
+import { getCurrentUser, can, isMember } from "@/lib/auth/user";
 import { buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatCard } from "@/components/primitives";
 import { AtmosphereHero } from "@/components/atmosphere-hero";
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  // Members have no Start page; their landing page is the Winkel.
+  if (isMember(user)) redirect("/products");
   const supabase = await createClient();
 
   const [{ count: productCount }, { count: orderCount }, { data: media }] =
