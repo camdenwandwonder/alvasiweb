@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { processOrderSync } from "@/lib/jamespro/sync";
 
-async function decideOrder(orderId: string, status: "approved" | "rejected") {
+// Approval sends the order straight to production (there is no separate
+// "goedgekeurd" stage in the pipeline).
+async function decideOrder(orderId: string, status: "in_production" | "rejected") {
   const user = await getCurrentUser();
   if (!user) throw new Error("Geen toegang");
   const supabase = await createClient();
@@ -33,13 +35,14 @@ async function decideOrder(orderId: string, status: "approved" | "rejected") {
       company_id: order.company_id,
       actor: user.id,
       status,
-      note: status === "approved" ? "Goedgekeurd" : "Afgewezen",
+      note:
+        status === "in_production" ? "Goedgekeurd, naar productie" : "Afgewezen",
     });
   }
 
-  // The DB trigger enqueues a JamesPRO sync row when status becomes approved;
+  // The DB trigger enqueues a JamesPRO sync row when an order is approved;
   // process it right after the response so the project/task appear promptly.
-  if (status === "approved") {
+  if (status === "in_production") {
     after(async () => {
       await processOrderSync(orderId);
     });
@@ -51,7 +54,7 @@ async function decideOrder(orderId: string, status: "approved" | "rejected") {
 }
 
 export async function approveOrder(orderId: string) {
-  await decideOrder(orderId, "approved");
+  await decideOrder(orderId, "in_production");
 }
 
 export async function rejectOrder(orderId: string) {

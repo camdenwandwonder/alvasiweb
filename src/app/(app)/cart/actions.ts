@@ -244,8 +244,9 @@ export async function createOrderFromCart(
     });
   }
 
-  // Auto-approved orders are synced to JamesPRO right after the response.
-  if (order.status === "approved") {
+  // Orders that skip approval go straight to production and are synced to
+  // JamesPRO right after the response ("approved" covers pre-migration rows).
+  if (order.status === "in_production" || order.status === "approved") {
     after(async () => {
       await processOrderSync(order.id);
     });

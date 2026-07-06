@@ -26,11 +26,9 @@ function nextActions(status: string): { label: string; to: string }[] {
   switch (status) {
     case "pending_approval":
       return [
-        { label: "Goedkeuren", to: "approved" },
+        { label: "Goedkeuren", to: "in_production" },
         { label: "Afwijzen", to: "rejected" },
       ];
-    case "approved":
-      return [{ label: "Naar productie", to: "in_production" }];
     case "in_production":
       return [{ label: "Markeer als verzonden", to: "shipped" }];
     case "shipped":

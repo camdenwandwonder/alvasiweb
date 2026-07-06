@@ -14,7 +14,16 @@ export type Allowance = {
   perProduct?: Record<string, { max: number; used: number; remaining: number }>;
 };
 
-const ACTIVE_STATUSES = ["approved", "fulfilled", "pending_approval"];
+// Everything except rejected/cancelled counts against the allowance —
+// approved orders move straight to in_production and onwards.
+const ACTIVE_STATUSES = [
+  "pending_approval",
+  "approved",
+  "in_production",
+  "shipped",
+  "delivered",
+  "fulfilled",
+];
 
 export function periodStart(period: string): Date {
   const now = new Date();

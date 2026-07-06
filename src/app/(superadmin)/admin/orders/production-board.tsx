@@ -40,7 +40,6 @@ export type BoardOrder = {
 
 const COLUMNS: { key: string; label: string }[] = [
   { key: "pending_approval", label: "Wacht op goedkeuring" },
-  { key: "approved", label: "Goedgekeurd" },
   { key: "in_production", label: "In productie" },
   { key: "shipped", label: "Verzonden" },
   { key: "delivered", label: "Geleverd" },
@@ -48,7 +47,6 @@ const COLUMNS: { key: string; label: string }[] = [
 
 const STATUS_OPTIONS = [
   "pending_approval",
-  "approved",
   "in_production",
   "shipped",
   "delivered",
