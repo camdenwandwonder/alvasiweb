@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
 import { getOrderRecipient } from "@/lib/shop/recipient";
+import { readOrderPrefs } from "@/lib/company-prefs";
 import type { RecipientOption } from "@/components/shop/recipient-switch";
 import { CartClient, type DeliveryAddress } from "./cart-client";
 
@@ -14,12 +15,13 @@ export default async function CartPage() {
 
   const forOthers = can(user, "orders.order_for_others");
   const admin = createAdminClient();
-  const [recipient, { data: addresses }, people] = await Promise.all([
+  const [recipient, { data: addresses }, people, { data: companyRow }] = await Promise.all([
     getOrderRecipient(user),
     admin
       .from("company_addresses")
       .select("id, label, recipient, street, postal_code, city, country, is_default")
       .eq("company_id", user.companyId)
+      .is("archived_at", null)
       .order("is_default", { ascending: false })
       .order("sort_order"),
     forOthers
@@ -40,6 +42,7 @@ export default async function CartPage() {
             ),
           )
       : Promise.resolve([] as RecipientOption[]),
+    admin.from("companies").select("settings").eq("id", user.companyId).maybeSingle(),
   ]);
 
   return (
@@ -48,6 +51,7 @@ export default async function CartPage() {
       me={user.fullName ?? user.email ?? "jezelf"}
       recipient={recipient ? { id: recipient.id, name: recipient.name, roleName: recipient.roleName } : null}
       people={forOthers ? people : null}
+      prefs={readOrderPrefs(companyRow?.settings as Record<string, unknown> | null)}
     />
   );
 }

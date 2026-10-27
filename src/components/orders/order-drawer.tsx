@@ -174,6 +174,23 @@ function Body({ order }: { order: OrderDetail }) {
         </div>
       </section>
 
+      {order.reference || order.cost_center ? (
+        <dl className="grid grid-cols-2 gap-3 rounded-xl border p-3 text-sm">
+          {order.reference ? (
+            <div>
+              <dt className="text-xs text-muted-foreground">Referentie</dt>
+              <dd className="font-medium">{order.reference}</dd>
+            </div>
+          ) : null}
+          {order.cost_center ? (
+            <div>
+              <dt className="text-xs text-muted-foreground">Kostenplaats</dt>
+              <dd className="font-medium">{order.cost_center}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
       {order.is_request ? (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
           <span className="font-medium">Aanvraag:</span>{" "}

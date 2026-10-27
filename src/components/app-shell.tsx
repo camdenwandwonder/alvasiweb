@@ -14,6 +14,7 @@ export function AppShell({
   brandName,
   subtitle,
   logoUrl,
+  logoIconUrl,
   primaryColor,
   secondaryColor,
   items,
@@ -26,6 +27,8 @@ export function AppShell({
   brandName: string;
   subtitle: string;
   logoUrl?: string | null;
+  /** Square icon; preferred in the 32px brand slot. */
+  logoIconUrl?: string | null;
   primaryColor?: string;
   secondaryColor?: string;
   items: SidebarNavItem[];
@@ -59,7 +62,7 @@ export function AppShell({
       <AppSidebar
         brandName={brandName}
         subtitle={subtitle}
-        logoUrl={logoUrl}
+        logoUrl={logoIconUrl || logoUrl}
         items={items}
         userName={userName}
         userEmail={userEmail}

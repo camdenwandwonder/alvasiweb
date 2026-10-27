@@ -24,20 +24,22 @@ import {
   EmptyState,
   StatCard,
 } from "@/components/primitives";
-import { CompanyBrandingForm } from "@/components/company-branding-form";
+import { BrandingEditor } from "@/components/settings/branding-editor";
+import { StartPageEditor } from "@/components/settings/start-page-editor";
+import { AlvasiContactBlock, CompanyDetailsBlock, OrderPrefsBlock } from "@/components/settings/general-settings";
+import { readOrderPrefs } from "@/lib/company-prefs";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BrandPreview } from "@/components/brand-preview";
 import { ProductThumb } from "@/components/product-thumb";
 import { CompanyAddressesPanel } from "@/components/company-addresses-panel";
 import type { CompanyAddress } from "@/lib/address-actions";
 import { getIntegration } from "@/lib/jamespro/sync";
-import { CompanyMedia } from "./company-media";
 import { CompanyJamespro } from "./company-jamespro";
 import { loadPersoneel } from "@/lib/personeel/data";
 import { PersoneelWorkspace } from "@/components/personeel/workspace";
 import { getCurrentUser } from "@/lib/auth/user";
 import { formatPrice } from "@/lib/format";
-import { updateCompany, deleteCompany } from "./actions";
+import { deleteCompany } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +64,7 @@ export default async function CompanyDetailPage({
   const { data: company } = await admin
     .from("companies")
     .select(
-      "id, name, slug, logo_url, primary_color, secondary_color, settings, jamespro_company_id",
+      "id, name, slug, short_name, logo_url, logo_icon_url, primary_color, secondary_color, settings, jamespro_company_id, welcome_text, announcement_text, announcement_from, announcement_until, contact_name, contact_email, contact_phone, alvasi_contact_name, alvasi_contact_email, alvasi_contact_phone",
     )
     .eq("id", id)
     .maybeSingle();
@@ -83,7 +85,8 @@ export default async function CompanyDetailPage({
         .from("company_media")
         .select("id, url")
         .eq("company_id", id)
-        .order("sort_order"),
+        .order("sort_order")
+        .order("created_at"),
       admin
         .from("company_addresses")
         .select("*")
@@ -114,7 +117,7 @@ export default async function CompanyDetailPage({
             <LayoutDashboard className="h-4 w-4" /> Overzicht
           </TabsTrigger>
           <TabsTrigger value="branding">
-            <Palette className="h-4 w-4" /> Huisstijl
+            <Palette className="h-4 w-4" /> Instellingen en huisstijl
           </TabsTrigger>
           <TabsTrigger value="products">
             <Package className="h-4 w-4" /> Producten
@@ -132,7 +135,7 @@ export default async function CompanyDetailPage({
             <Plug className="h-4 w-4" /> JamesPRO
           </TabsTrigger>
           <TabsTrigger value="media">
-            <Images className="h-4 w-4" /> Sfeerbeelden
+            <Images className="h-4 w-4" /> Startpagina
           </TabsTrigger>
         </TabsList>
 
@@ -154,21 +157,21 @@ export default async function CompanyDetailPage({
 
         {/* Huisstijl */}
         <TabsContent value="branding" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Huisstijl bewerken</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CompanyBrandingForm
-                action={updateCompany.bind(null, id)}
-                defaultName={company.name}
-                defaultLogoUrl={company.logo_url}
-                defaultPrimary={company.primary_color}
-                defaultSecondary={company.secondary_color}
-                submitLabel="Wijzigingen opslaan"
-              />
-            </CardContent>
-          </Card>
+          <div className="space-y-8">
+            <CompanyDetailsBlock company={company} />
+            <AlvasiContactBlock company={company} editable />
+            <OrderPrefsBlock companyId={id} prefs={readOrderPrefs(company.settings as Record<string, unknown>)} />
+            <BrandingEditor
+              companyId={id}
+              companyName={company.short_name || company.name}
+              initial={{
+                logo_url: company.logo_url ?? "",
+                logo_icon_url: company.logo_icon_url ?? "",
+                primary_color: company.primary_color ?? "#0f172a",
+                secondary_color: company.secondary_color ?? "#6366f1",
+              }}
+            />
+          </div>
 
           <Card className="mt-6 border-destructive/30">
             <CardHeader>
@@ -310,14 +313,17 @@ export default async function CompanyDetailPage({
 
         {/* Sfeerbeelden */}
         <TabsContent value="media" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Sfeerbeelden</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CompanyMedia companyId={id} images={media ?? []} />
-            </CardContent>
-          </Card>
+          <StartPageEditor
+            companyId={id}
+            companyName={company.name}
+            images={media ?? []}
+            initial={{
+              welcome_text: company.welcome_text ?? "",
+              announcement_text: company.announcement_text ?? "",
+              announcement_from: company.announcement_from ?? "",
+              announcement_until: company.announcement_until ?? "",
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   if (isMember(user)) redirect("/products");
   const supabase = await createClient();
 
-  const [{ count: productCount }, { count: orderCount }, { data: media }] =
+  const [{ count: productCount }, { count: orderCount }, { data: media }, { data: companyRow }] =
     await Promise.all([
       supabase
         .from("products")
@@ -27,11 +27,18 @@ export default async function DashboardPage() {
         .select("url")
         .eq("company_id", user?.companyId ?? "")
         .order("sort_order"),
+      supabase
+        .from("companies")
+        .select("welcome_text")
+        .eq("id", user?.companyId ?? "")
+        .maybeSingle(),
     ]);
 
   const firstName = user?.fullName?.split(" ")[0];
   const title = `Welkom${firstName ? `, ${firstName}` : ""}`;
-  const subtitle = `Bestel de producten van ${user?.company?.name ?? "je bedrijf"}.`;
+  const subtitle =
+    (companyRow?.welcome_text as string | null)?.trim() ||
+    `Bestel de producten van ${user?.company?.name ?? "je bedrijf"}.`;
   const heroImages = (media ?? []).map((m) => m.url);
 
   return (

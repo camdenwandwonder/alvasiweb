@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, LayoutGrid, List, Package, Ruler, Search, Sparkles, X } from "lucide-react";
+import { ChevronDown, LayoutGrid, List, Megaphone, Package, Ruler, Search, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductImg } from "./product-img";
 import type { ShopData, ShopProduct } from "@/lib/shop";
@@ -37,6 +37,7 @@ export function ShopView({
   title,
   description,
   recipients,
+  announcement = null,
   initial = {},
 }: {
   data: ShopData;
@@ -51,6 +52,8 @@ export function ShopView({
   /** Managers who may order for others: the people to choose from. */
   recipients?: { people: RecipientOption[]; current: { id: string; name: string } | null };
   initial?: ShopInitial;
+  /** Company announcement shown above the shop (already date-checked). */
+  announcement?: string | null;
 }) {
   const [favs, setFavs] = useState<Record<string, boolean>>({});
   const products = useMemo(
@@ -204,6 +207,16 @@ export function ShopView({
           ) : null}
         </div>
       </div>
+
+      {announcement ? (
+        <div
+          role="note"
+          className="mb-4 flex items-start gap-2 rounded-xl border border-[var(--brand)]/30 bg-[var(--brand)]/5 px-4 py-2.5 text-sm"
+        >
+          <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand)]" />
+          <p className="whitespace-pre-line">{announcement}</p>
+        </div>
+      ) : null}
 
       {/* Plakkende balk */}
       <div className="-mx-4 mb-5 space-y-2.5 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:sticky md:top-14 md:z-20 md:-mx-6 md:px-6">

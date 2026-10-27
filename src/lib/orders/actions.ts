@@ -26,6 +26,8 @@ export type OrderDetail = {
   placed_by_name: string | null;
   note: string | null;
   request_reason: string | null;
+  reference: string | null;
+  cost_center: string | null;
   is_request: boolean;
   ship_to: {
     name: string | null;
@@ -75,7 +77,7 @@ export async function getOrderDetail(
   const { data: o } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, created_at, decided_at, company_id, ordered_by, ordered_by_name, role_name, approved_by, placed_by, note, request_reason, is_request, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, ship_to_country, ship_to_custom, total, credit_total, items:order_items(id, product_id, product_name, variant_label, sku, quantity, unit_price, line_total, credit_cost, created_at)",
+      "id, order_number, status, created_at, decided_at, company_id, ordered_by, ordered_by_name, role_name, approved_by, placed_by, note, request_reason, reference, cost_center, is_request, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, ship_to_country, ship_to_custom, total, credit_total, items:order_items(id, product_id, product_name, variant_label, sku, quantity, unit_price, line_total, credit_cost, created_at)",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -158,6 +160,8 @@ export async function getOrderDetail(
           : null,
       note: (o.note as string | null) ?? null,
       request_reason: (o.request_reason as string | null) ?? null,
+      reference: (o.reference as string | null) ?? null,
+      cost_center: (o.cost_center as string | null) ?? null,
       is_request: !!o.is_request,
       ship_to: {
         name: (o.ship_to_name as string | null) ?? null,

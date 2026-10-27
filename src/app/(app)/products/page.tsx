@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, can, isMember } from "@/lib/auth/user";
 import { createAdminClient } from "@/lib/supabase/server";
 import { buildShop } from "@/lib/shop";
+import { activeAnnouncement } from "@/lib/announcement";
 import { getOrderRecipient } from "@/lib/shop/recipient";
 import { ShopView } from "@/components/shop/shop-view";
 import type { RecipientOption } from "@/components/shop/recipient-switch";
@@ -22,7 +23,7 @@ export default async function ProductsPage({
   const forOthers = can(user, "orders.order_for_others");
   const manager = !isMember(user);
 
-  const [shop, people] = await Promise.all([
+  const [shop, people, { data: companyRow }] = await Promise.all([
     buildShop(
       recipient
         ? {
@@ -60,6 +61,11 @@ export default async function ProductsPage({
             ),
           )
       : Promise.resolve([] as RecipientOption[]),
+    createAdminClient()
+      .from("companies")
+      .select("announcement_text, announcement_from, announcement_until")
+      .eq("id", user.companyId)
+      .maybeSingle(),
   ]);
 
   const forName = recipient ? recipient.name.split(" ")[0]! : null;
@@ -82,6 +88,7 @@ export default async function ProductsPage({
           ? { people, current: recipient ? { id: recipient.id, name: recipient.name } : null }
           : undefined
       }
+      announcement={activeAnnouncement(companyRow)}
       initial={{
         categorie: one("categorie"),
         maat: one("maat"),

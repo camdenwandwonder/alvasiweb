@@ -44,7 +44,7 @@ export default async function OrderDetailPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, created_at, note, subtotal, total, credit_total, ordered_by, placed_by, ordered_by_name, company_id, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, items:order_items(product_name, variant_label, quantity, unit_price, line_total, credit_cost)",
+      "id, order_number, status, created_at, note, reference, cost_center, subtotal, total, credit_total, ordered_by, placed_by, ordered_by_name, company_id, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, items:order_items(product_name, variant_label, quantity, unit_price, line_total, credit_cost)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -197,6 +197,28 @@ export default async function OrderDetailPage({
                 .filter(Boolean)
                 .join(" ")}
             </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {order.reference || order.cost_center ? (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">Bestelgegevens</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
+            {order.reference ? (
+              <div>
+                <p className="text-xs text-muted-foreground">Referentie</p>
+                <p className="font-medium">{order.reference}</p>
+              </div>
+            ) : null}
+            {order.cost_center ? (
+              <div>
+                <p className="text-xs text-muted-foreground">Kostenplaats</p>
+                <p className="font-medium">{order.cost_center}</p>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

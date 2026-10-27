@@ -32,6 +32,8 @@ export type OrderRow = {
   custom_address: boolean;
   is_request: boolean;
   has_note: boolean;
+  reference: string | null;
+  cost_center: string | null;
   items: { product_name: string; variant_label: string | null; quantity: number }[];
   quantity: number;
 };
@@ -155,7 +157,7 @@ function parseSummary(raw: Record<string, unknown> | null): Summary {
 }
 
 const ORDER_COLUMNS =
-  "id, order_number, status, total, credit_total, created_at, ordered_by, ordered_by_name, role_name, ship_to_address, ship_to_city, ship_to_custom, is_request, note, company:companies(name), items:order_items(product_name, variant_label, quantity)";
+  "id, order_number, status, total, credit_total, created_at, ordered_by, ordered_by_name, role_name, ship_to_address, ship_to_city, ship_to_custom, is_request, note, reference, cost_center, company:companies(name), items:order_items(product_name, variant_label, quantity)";
 
 type RawOrder = {
   id: string;
@@ -172,6 +174,8 @@ type RawOrder = {
   ship_to_custom: boolean | null;
   is_request: boolean | null;
   note: string | null;
+  reference: string | null;
+  cost_center: string | null;
   company: { name: string } | { name: string }[] | null;
   items: { product_name: string; variant_label: string | null; quantity: number }[] | null;
 };
@@ -194,6 +198,8 @@ function mapOrder(o: RawOrder): OrderRow {
     custom_address: !!o.ship_to_custom,
     is_request: !!o.is_request,
     has_note: !!o.note?.trim(),
+    reference: o.reference ?? null,
+    cost_center: o.cost_center ?? null,
     items,
     quantity: items.reduce((s, i) => s + i.quantity, 0),
   };

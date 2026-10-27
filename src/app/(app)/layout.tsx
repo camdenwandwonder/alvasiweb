@@ -35,7 +35,7 @@ export default async function AppLayout({
 
   const [recipient, { data: companyRow }] = await Promise.all([
     getOrderRecipient(user),
-    createAdminClient().from("companies").select("settings").eq("id", user.company.id).maybeSingle(),
+    createAdminClient().from("companies").select("settings, short_name, logo_icon_url").eq("id", user.company.id).maybeSingle(),
   ]);
   const ordering = readOrderingSettings((companyRow?.settings as Record<string, unknown>) ?? {});
   const canOrder = can(user, "orders.create");
@@ -95,15 +95,16 @@ export default async function AppLayout({
       sync={canOrder}
     >
       <AppShell
-        brandName={user.company.name}
+        brandName={(companyRow?.short_name as string | null) || user.company.name}
         subtitle="Bestelportaal"
         logoUrl={user.company.logo_url}
+        logoIconUrl={(companyRow?.logo_icon_url as string | null) ?? null}
         primaryColor={user.company.primary_color}
         secondaryColor={user.company.secondary_color}
         items={items}
         userName={user.fullName ?? ""}
         userEmail={user.email ?? ""}
-        accountHref="/account"
+        accountHref="/profile"
         showCart={canOrder}
       >
         {recipient ? <RecipientBar name={recipient.name} roleName={recipient.roleName} /> : null}

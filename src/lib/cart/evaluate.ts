@@ -191,7 +191,7 @@ export async function runCart(
       .in("id", productIds.length ? productIds : ["00000000-0000-0000-0000-000000000000"]),
     admin.from("category_role_visibility").select("category_id, role_id").eq("company_id", companyId),
     getAllowanceFor(companyId, orderer.id),
-    admin.from("company_addresses").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+    admin.from("company_addresses").select("id", { count: "exact", head: true }).eq("company_id", companyId).is("archived_at", null),
     orderer.roleId
       ? admin.from("roles").select("requires_order_approval").eq("id", orderer.roleId).maybeSingle()
       : Promise.resolve({ data: null }),

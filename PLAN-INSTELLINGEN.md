@@ -1,6 +1,6 @@
 # Plan: Instellingen en Mijn profiel die echt iets voor je doen
 
-Status: **plan, nog niet gebouwd** (28-10-2026).
+Status: **gebouwd** (28-10-2026), volgens de besluiten hieronder.
 
 Doel:
 
@@ -372,6 +372,18 @@ tint van dezelfde kleur zoekt.
 8. **Postcode + huisnummer automatisch invullen via PDOK** (de gratis adresservice van de
    overheid)?
    Advies: **ja**.
+
+### Besluiten (28-10-2026)
+
+1. Menu links met losse onderdelen: **akkoord**.
+2. E-mailmeldingen: **nee**. Het onderdeel Meldingen vervalt, ook in het profiel.
+3. Eigen wachtwoord wijzigen: **ja**.
+4. Bestelreferentie en kostenplaats: **akkoord**.
+5. Startpagina door het bedrijf zelf: **ja**.
+6. Standaard leveradres per medewerker: **nee**. Alleen de manager beheert de
+   leveradressen.
+7. Account samenvoegen met Mijn profiel: **akkoord**.
+8. Postcode via PDOK: **ja**.
 
 ## 10. Bewust niet (nu)
 

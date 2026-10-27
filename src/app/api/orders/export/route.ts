@@ -125,6 +125,8 @@ export async function GET(request: Request) {
           { header: "Afwijkend adres", kind: "text", width: 15 },
           { header: "Aanvraag", kind: "text", width: 10 },
           { header: "Geplaatst door", kind: "text", width: 22 },
+          { header: "Referentie", kind: "text", width: 18 },
+          { header: "Kostenplaats", kind: "text", width: 18 },
         ];
         const emails = own ? new Map<string, string>() : await emailsFor(rows.map((r) => r.ordered_by));
         const placedBy = await placedByNames(rows);
@@ -146,6 +148,8 @@ export async function GET(request: Request) {
             yesNo(o.custom_address),
             yesNo(o.is_request),
             placedBy.get(o.id) ?? "",
+            o.reference ?? "",
+            o.cost_center ?? "",
           ]),
         };
       } else {
@@ -184,6 +188,8 @@ export async function GET(request: Request) {
           { header: "Medewerker", kind: "text", width: 22 },
           { header: "Functie", kind: "text", width: 16 },
           { header: "Status", kind: "text", width: 20 },
+          { header: "Referentie", kind: "text", width: 18 },
+          { header: "Kostenplaats", kind: "text", width: 18 },
           { header: "Product", kind: "text", width: 30 },
           { header: "Variant", kind: "text", width: 24 },
           { header: "Artikelnummer", kind: "text", width: 16 },
@@ -213,6 +219,8 @@ export async function GET(request: Request) {
               o.name,
               o.role_name ?? "",
               statusLabel(o.status),
+              o.reference ?? "",
+              o.cost_center ?? "",
               l.product_name,
               l.variant_label ?? "",
               l.sku ?? "",

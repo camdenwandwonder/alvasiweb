@@ -18,7 +18,7 @@ export async function companyGate(
 export async function logAudit(entry: {
   companyId: string;
   actor: CurrentUser | null;
-  targetType: "user" | "role" | "settings" | "budget_request" | "order";
+  targetType: "user" | "role" | "settings" | "address" | "budget_request" | "order";
   targetId?: string | null;
   action: string;
   summary: string;

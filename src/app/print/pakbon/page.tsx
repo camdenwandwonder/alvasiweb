@@ -21,6 +21,8 @@ type Order = {
   ordered_by_name: string | null;
   role_name: string | null;
   note: string | null;
+  reference: string | null;
+  cost_center: string | null;
   ship_to_name: string | null;
   ship_to_address: string | null;
   ship_to_postal: string | null;
@@ -58,7 +60,7 @@ export default async function PackingSlipPage({
     const { data } = await supabase
       .from("orders")
       .select(
-        "id, order_number, created_at, ordered_by_name, role_name, note, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, ship_to_country, company:companies(name, logo_url), items:order_items(product_name, variant_label, sku, quantity, created_at)",
+        "id, order_number, created_at, ordered_by_name, role_name, note, reference, cost_center, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, ship_to_country, company:companies(name, logo_url), items:order_items(product_name, variant_label, sku, quantity, created_at)",
       )
       .in("id", ids);
     const position = new Map(ids.map((id, i) => [id, i]));
@@ -102,6 +104,8 @@ export default async function PackingSlipPage({
                   <h1 className="text-2xl font-semibold tracking-tight">Pakbon</h1>
                   <p className="mt-1 text-sm">{o.order_number ?? "Bestelling"}</p>
                   <p className="text-sm text-neutral-600">{date(o.created_at)}</p>
+                  {o.reference ? <p className="text-sm">Referentie: {o.reference}</p> : null}
+                  {o.cost_center ? <p className="text-sm">Kostenplaats: {o.cost_center}</p> : null}
                 </div>
               </header>
 

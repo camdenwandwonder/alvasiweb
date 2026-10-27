@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  Hash,
   Check,
   CheckCircle2,
   Loader2,
@@ -26,6 +27,8 @@ import { BudgetSummary } from "@/components/cart/cart-drawer";
 import { cartAmount } from "@/components/cart/cart-format";
 import { useCartCheck } from "@/components/cart/use-cart-check";
 import { RecipientSwitch, type RecipientOption } from "@/components/shop/recipient-switch";
+import { NativeSelect } from "@/components/primitives";
+import type { OrderPrefs } from "@/lib/company-prefs";
 import { createOrderFromCart } from "./actions";
 
 export type DeliveryAddress = {
@@ -46,12 +49,15 @@ export function CartClient({
   me,
   recipient,
   people,
+  prefs,
 }: {
   addresses: DeliveryAddress[];
   me: string;
   recipient: { id: string; name: string; roleName: string | null } | null;
   /** People a manager may order for (null = no permission). */
   people: RecipientOption[] | null;
+  /** Order reference and cost centre settings of the company. */
+  prefs: OrderPrefs;
 }) {
   const cart = useCart();
   const router = useRouter();
@@ -62,6 +68,8 @@ export function CartClient({
   const isCustom = selection === CUSTOM;
   const [ship, setShip] = useState({ name: "", address: "", postal: "", city: "", country: "" });
   const [note, setNote] = useState("");
+  const [reference, setReference] = useState("");
+  const [costCenter, setCostCenter] = useState("");
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -91,7 +99,11 @@ export function CartClient({
         }.`
       : customIncomplete
         ? "Vul het afwijkende leveradres in (straat en plaats)."
-        : null);
+        : prefs.reference === "required" && !reference.trim()
+          ? `Vul de ${prefs.referenceLabel.toLowerCase()} in.`
+          : prefs.costCenter === "required" && !costCenter
+            ? "Kies een kostenplaats."
+            : null);
 
   async function submit() {
     if (blocked || submitting) return;
@@ -113,6 +125,8 @@ export function CartClient({
           addressId: isCustom ? null : selection,
           custom: isCustom ? ship : undefined,
           note: note.trim() || undefined,
+          reference: reference.trim() || undefined,
+          costCenter: costCenter || undefined,
         },
         { reason: reason.trim() || undefined, clientKey: clientKey.current },
       );
@@ -243,6 +257,53 @@ export function CartClient({
               </div>
             ) : null}
           </Section>
+
+          {prefs.reference !== "off" || prefs.costCenter !== "off" ? (
+            <Section icon={Hash} title="Bestelgegevens">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {prefs.reference !== "off" ? (
+                  <div>
+                    <label htmlFor="bestelreferentie" className="mb-1.5 block text-sm font-medium">
+                      {prefs.referenceLabel}
+                      {prefs.reference === "ask" ? (
+                        <span className="font-normal text-muted-foreground"> (optioneel)</span>
+                      ) : null}
+                    </label>
+                    <Input
+                      id="bestelreferentie"
+                      value={reference}
+                      maxLength={60}
+                      onChange={(e) => setReference(e.target.value)}
+                      required={prefs.reference === "required"}
+                    />
+                  </div>
+                ) : null}
+                {prefs.costCenter !== "off" ? (
+                  <div>
+                    <label htmlFor="kostenplaats" className="mb-1.5 block text-sm font-medium">
+                      Kostenplaats
+                      {prefs.costCenter === "ask" ? (
+                        <span className="font-normal text-muted-foreground"> (optioneel)</span>
+                      ) : null}
+                    </label>
+                    <NativeSelect
+                      id="kostenplaats"
+                      value={costCenter}
+                      onChange={(e) => setCostCenter(e.target.value)}
+                      className="h-9"
+                    >
+                      <option value="">{prefs.costCenter === "required" ? "Kies een kostenplaats" : "Geen"}</option>
+                      {prefs.costCenters.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                ) : null}
+              </div>
+            </Section>
+          ) : null}
 
           <Section icon={PenLine} title="Opmerking" optional>
             <Textarea

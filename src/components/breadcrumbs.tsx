@@ -29,6 +29,11 @@ const LABELS: Record<string, string> = {
   visibility: "Catalogus",
   integrations: "Integraties",
   settings: "Instellingen",
+  algemeen: "Algemeen",
+  huisstijl: "Huisstijl",
+  startpagina: "Startpagina",
+  leveradressen: "Leveradressen",
+  wijzigingen: "Wijzigingen",
   profile: "Mijn profiel",
 };
 

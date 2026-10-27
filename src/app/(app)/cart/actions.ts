@@ -11,6 +11,7 @@ import { sendEmail } from "@/lib/email";
 import { processOrderSync } from "@/lib/jamespro/sync";
 import { runCart } from "@/lib/cart/evaluate";
 import type { CartLineInput } from "@/lib/cart/types";
+import { readOrderPrefs } from "@/lib/company-prefs";
 
 export type CheckoutItem = CartLineInput & {
   variantLabel?: string | null;
@@ -31,6 +32,10 @@ export type Delivery = {
   /** Manual address fields (used when addressId is empty). */
   custom?: ShipTo;
   note?: string;
+  /** Order reference (e.g. a PO number), when the company uses one. */
+  reference?: string;
+  /** Cost centre from the company's list, when the company uses them. */
+  costCenter?: string;
 };
 
 export type CheckoutResult =
@@ -69,6 +74,24 @@ export async function createOrderFromCart(
   const existing = clientKey ? await findByKey(user.id, clientKey) : null;
   if (existing) return existing;
 
+  // Order reference and cost centre, as the company configured them.
+  const { data: companyRow } = await admin
+    .from("companies")
+    .select("settings")
+    .eq("id", companyId)
+    .maybeSingle();
+  const prefs = readOrderPrefs(companyRow?.settings as Record<string, unknown> | null);
+  const reference =
+    prefs.reference === "off" ? null : delivery.reference?.trim().slice(0, 60) || null;
+  if (prefs.reference === "required" && !reference)
+    return { ok: false, error: `Vul de ${prefs.referenceLabel.toLowerCase()} in.` };
+  const costCenter =
+    prefs.costCenter === "off" ? null : delivery.costCenter?.trim().slice(0, 60) || null;
+  if (costCenter && !prefs.costCenters.includes(costCenter))
+    return { ok: false, error: "Kies een kostenplaats uit de lijst." };
+  if (prefs.costCenter === "required" && !costCenter)
+    return { ok: false, error: "Kies een kostenplaats." };
+
   // Delivery address: a saved company address is trusted; a manual address is
   // a deviation (needs approval) only when saved addresses exist.
   const note = delivery.note?.trim() || null;
@@ -79,6 +102,7 @@ export async function createOrderFromCart(
       .select("label, recipient, street, postal_code, city, country")
       .eq("id", delivery.addressId)
       .eq("company_id", companyId)
+      .is("archived_at", null)
       .maybeSingle();
     if (!addr) return { ok: false, error: "Gekozen leveradres niet gevonden" };
     shipTo = {
@@ -148,6 +172,8 @@ export async function createOrderFromCart(
       is_request: isRequest,
       request_reason: finalReason,
       client_key: clientKey,
+      reference,
+      cost_center: costCenter,
     })
     .select("id, order_number, status")
     .single();

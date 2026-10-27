@@ -68,7 +68,7 @@ export default async function OrderPlacedPage({ params }: { params: Promise<{ id
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, created_at, total, credit_total, ordered_by, placed_by, ordered_by_name, company_id, is_request, request_reason, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, ship_to_country, ship_to_custom, items:order_items(product_name, variant_label, quantity, line_total, credit_cost)",
+      "id, order_number, status, created_at, total, credit_total, ordered_by, placed_by, ordered_by_name, company_id, is_request, request_reason, reference, cost_center, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, ship_to_country, ship_to_custom, items:order_items(product_name, variant_label, quantity, line_total, credit_cost)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -249,6 +249,8 @@ export default async function OrderPlacedPage({ params }: { params: Promise<{ id
                   </p>
                 ))}
                 {order.ship_to_custom ? <p className="mt-1 text-xs text-amber-700">Ander adres, vraagt goedkeuring</p> : null}
+                {order.reference ? <p className="mt-2 text-xs text-muted-foreground">Referentie: {order.reference as string}</p> : null}
+                {order.cost_center ? <p className="text-xs text-muted-foreground">Kostenplaats: {order.cost_center as string}</p> : null}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">Geen adres opgegeven</p>

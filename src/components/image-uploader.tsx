@@ -12,6 +12,9 @@ export function ImageUploader({
   bucket,
   defaultUrl,
   aspect = "video",
+  fit = "cover",
+  maxMb = 5,
+  hint,
   onChange,
 }: {
   /** Hidden input name — the resulting public URL is submitted under this. */
@@ -20,6 +23,11 @@ export function ImageUploader({
   bucket: string;
   defaultUrl?: string | null;
   aspect?: "video" | "square";
+  /** "contain" keeps logos whole instead of cropping them. */
+  fit?: "cover" | "contain";
+  maxMb?: number;
+  /** Requirements shown in the empty state. */
+  hint?: string;
   onChange?: (url: string) => void;
 }) {
   const [url, setUrlState] = useState(defaultUrl ?? "");
@@ -34,11 +42,11 @@ export function ImageUploader({
 
   async function handleFile(file: File) {
     if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file.");
+      setError("Kies een afbeelding (PNG, JPG, WEBP of SVG).");
       return;
     }
-    if (file.size > MAX_BYTES) {
-      setError("Image must be 5 MB or smaller.");
+    if (file.size > Math.min(MAX_BYTES, maxMb * 1024 * 1024)) {
+      setError(`De afbeelding mag maximaal ${maxMb} MB zijn.`);
       return;
     }
     setError(null);
@@ -54,7 +62,7 @@ export function ImageUploader({
       const { data } = supabase.storage.from(bucket).getPublicUrl(path);
       setUrl(data.publicUrl);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed.");
+      setError(e instanceof Error ? e.message : "Uploaden is mislukt.");
     } finally {
       setUploading(false);
     }
@@ -74,12 +82,16 @@ export function ImageUploader({
           )}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="Preview" className="h-full w-full object-cover" />
+          <img
+            src={url}
+            alt="Voorbeeld"
+            className={cn("h-full w-full", fit === "contain" ? "object-contain p-2" : "object-cover")}
+          />
           <button
             type="button"
             onClick={() => setUrl("")}
             className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-background/90 text-foreground shadow-sm hover:bg-background"
-            aria-label="Remove image"
+            aria-label="Afbeelding verwijderen"
           >
             <X className="h-4 w-4" />
           </button>
@@ -110,18 +122,16 @@ export function ImageUploader({
           {uploading ? (
             <>
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Uploading…</span>
+              <span className="text-sm text-muted-foreground">Uploaden…</span>
             </>
           ) : (
             <>
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <UploadCloud className="h-5 w-5" />
               </span>
-              <span className="text-sm font-medium">
-                Click to upload or drag &amp; drop
-              </span>
+              <span className="text-sm font-medium">Klik om te uploaden of sleep een bestand hierheen</span>
               <span className="text-xs text-muted-foreground">
-                PNG, JPG, WEBP up to 5 MB
+                {hint ?? `PNG, JPG of WEBP, maximaal ${maxMb} MB`}
               </span>
             </>
           )}
