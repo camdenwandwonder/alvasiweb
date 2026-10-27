@@ -34,7 +34,7 @@ export function CartButton() {
       aria-label={`${label}: ${cart.count} ${cart.count === 1 ? "artikel" : "artikelen"}${amount ? `, ${amount}` : ""}`}
       aria-haspopup="dialog"
       className={cn(
-        "ml-auto inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3 text-sm font-medium transition hover:bg-muted",
+        "inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3 text-sm font-medium transition hover:bg-muted",
         cart.count && "border-[var(--brand)]/40",
       )}
     >

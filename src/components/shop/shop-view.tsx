@@ -196,12 +196,15 @@ export function ShopView({
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AllowanceChip
-            settings={data.settings}
-            allowance={data.allowance}
-            canRequest={canRequest && !preview && !forName}
-            forName={forName}
-          />
+          {/* In the shop itself the budget sits in the header; the preview has no header. */}
+          {preview ? (
+            <AllowanceChip
+              settings={data.settings}
+              allowance={data.allowance}
+              canRequest={false}
+              forName={forName}
+            />
+          ) : null}
           {recipients && recipients.people.length ? (
             <RecipientSwitch people={recipients.people} current={recipients.current} />
           ) : null}

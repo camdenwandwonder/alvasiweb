@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CartButton } from "@/components/cart/cart-button";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { HeaderAllowance } from "@/components/cart/header-allowance";
 
 export function AppShell({
   brandName,
@@ -73,7 +74,12 @@ export function AppShell({
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 h-5" />
           <Breadcrumbs />
-          {showCart ? <CartButton /> : null}
+          {showCart ? (
+            <div className="ml-auto flex items-center gap-2">
+              <HeaderAllowance />
+              <CartButton />
+            </div>
+          ) : null}
         </header>
         {showCart ? <CartDrawer /> : null}
         <div className="p-4 md:p-6">{children}</div>

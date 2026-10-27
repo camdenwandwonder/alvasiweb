@@ -58,15 +58,23 @@ export function AllowanceChip({
             type="button"
             onClick={toggle}
             aria-expanded={open}
+            aria-label={`${forName ? `${forName}: ` : ""}${label}. Details bekijken`}
             className={cn(
-              "inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3.5 text-sm font-medium transition hover:bg-muted",
+              "inline-flex h-10 items-center gap-2 rounded-full border bg-card px-3 text-sm font-medium whitespace-nowrap transition hover:bg-muted sm:px-3.5",
               low && "border-amber-300 bg-amber-50 text-amber-900",
             )}
           >
             <Icon className={cn("h-4 w-4", low ? "text-amber-600" : "text-[var(--brand)]")} />
-            {forName ? <span className="font-normal text-muted-foreground">{forName}:</span> : null}
-            {label}
-            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+            {forName ? <span className="hidden font-normal text-muted-foreground sm:inline">{forName}:</span> : null}
+            {budget ? (
+              <span>
+                {formatAmount(Math.max(0, budget.remaining), settings.payment)}
+                <span className="hidden sm:inline"> over</span>
+              </span>
+            ) : (
+              <span className="hidden sm:inline">{label}</span>
+            )}
+            <ChevronDown className="hidden h-3.5 w-3.5 opacity-60 sm:block" />
           </button>
         )}
       >
