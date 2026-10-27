@@ -342,6 +342,18 @@ knoppen met eigen namen.
 7. **Gewijzigde prijs sinds toevoegen?**
    Advies: **de nieuwe prijs automatisch gebruiken en dat melden** bij de regel.
 
+### Besluiten (28-10-2026)
+
+1. Zijpaneel opent alleen bij het eerste product per bezoek: **akkoord**.
+2. Winkelwagen op de server, op alle apparaten: **ja**.
+3. "Later bestellen": **ja**.
+4. Bevestigingspagina: **toegelicht met een schets**, wacht op akkoord.
+5. Verwachte leverdatum: **nee**. Die vervalt overal: in het overzicht, bij de levering
+   en op de bevestigingspagina.
+6. Bedrag in de kopknop: **ja**, in euro of in credits als het bedrijf met credits werkt.
+   Op mobiel en bij verborgen prijzen alleen het aantal.
+7. Gewijzigde prijs: **akkoord**, de nieuwe prijs telt en dat wordt bij de regel gemeld.
+
 ## 11. Bewust niet (nu)
 
 - Betalen of een betaalstap: het bedrijf betaalt, er is niets af te rekenen.
