@@ -8,6 +8,8 @@ import {
   LayoutDashboard,
   Palette,
   UserCog,
+  ClipboardList,
+  ArrowRight,
   Images,
   MapPin,
   Plug,
@@ -92,7 +94,7 @@ export default async function CompanyDetailPage({
     ]);
 
   const productList = products ?? [];
-  const tabs = ["overview", "branding", "products", "personeel", "addresses", "jamespro", "media"];
+  const tabs = ["overview", "branding", "products", "personeel", "bestellingen", "addresses", "jamespro", "media"];
   const initialTab = tabs.includes(query.tab ?? "") ? query.tab! : "overview";
 
   return (
@@ -119,6 +121,9 @@ export default async function CompanyDetailPage({
           </TabsTrigger>
           <TabsTrigger value="personeel">
             <UserCog className="h-4 w-4" /> Personeel
+          </TabsTrigger>
+          <TabsTrigger value="bestellingen">
+            <ClipboardList className="h-4 w-4" /> Bestellingen
           </TabsTrigger>
           <TabsTrigger value="addresses">
             <MapPin className="h-4 w-4" /> Leveradressen
@@ -262,6 +267,27 @@ export default async function CompanyDetailPage({
             tabParam="sub"
             header={false}
           />
+        </TabsContent>
+
+        {/* Bestellingen */}
+        <TabsContent value="bestellingen" className="mt-4">
+          <Card>
+            <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">Bestellingen van {company.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Zoek en filter op periode, medewerker, functie en product, bekijk per
+                  medewerker of per product, en exporteer naar Excel.
+                </p>
+              </div>
+              <Link
+                href={`/admin/bestellingen?bedrijf=${id}`}
+                className={buttonVariants()}
+              >
+                Open het bestellingenoverzicht <ArrowRight className="h-4 w-4" />
+              </Link>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Leveradressen */}

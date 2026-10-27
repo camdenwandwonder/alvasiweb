@@ -1,6 +1,6 @@
 # Plan: een bestellingenoverzicht dat echt antwoord geeft
 
-Status: **plan, nog niet gebouwd** (27-10-2026).
+Status: **gebouwd** (28-10-2026), met het advies bij alle beslispunten.
 
 Doel: de pagina Bestellingen moet een manager en Alvasi binnen een paar seconden laten zien
 **wie wat heeft besteld, in welke periode, voor hoeveel, en wat er nog openstaat**. Dat moet

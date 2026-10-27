@@ -1,113 +1,48 @@
-import Link from "next/link";
-import { ClipboardList } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { getCurrentUser, can, isMember } from "@/lib/auth/user";
-import { PageHeader, EmptyState, StatusBadge } from "@/components/primitives";
-import { formatDate, ORDER_STATUS } from "@/lib/format";
-import { displayFor, formatValue, readOrderingSettings } from "@/lib/ordering";
+import { parseQuery } from "@/lib/orders/filters";
+import { loadOverview, savedViewScope, type OverviewScope } from "@/lib/orders/overview";
+import { OrdersWorkspace } from "@/components/orders/orders-workspace";
 
 export const dynamic = "force-dynamic";
 
-type OrderRow = {
-  id: string;
-  order_number: string | null;
-  status: string;
-  total: number;
-  credit_total: number | null;
-  created_at: string;
-  ordered_by: string;
-  items: { quantity: number; product_name: string }[];
-};
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await getCurrentUser();
-  const supabase = await createClient();
+  if (!user) redirect("/login");
+  if (!user.companyId) redirect(user.isSuperadmin ? "/admin/bestellingen" : "/login");
 
-  const [{ data }, { data: company }] = await Promise.all([
-    supabase
-      .from("orders")
-      .select(
-        "id, order_number, status, total, credit_total, created_at, ordered_by, items:order_items(quantity, product_name)",
-      )
-      .order("created_at", { ascending: false }),
-    supabase.from("companies").select("settings").eq("id", user?.companyId ?? "").maybeSingle(),
-  ]);
-  const display = displayFor(
-    readOrderingSettings(company?.settings as Record<string, unknown> | null),
-    isMember(user) ? "member" : "manager",
-  );
-
-  const orders = (data ?? []) as unknown as OrderRow[];
+  const sp = await searchParams;
+  const query = parseQuery(sp);
   const viewAll = can(user, "orders.view_all");
+  if (!viewAll && !can(user, "orders.view_own")) redirect("/products");
 
-  const names = new Map<string, string>();
-  if (viewAll && orders.length) {
-    const ids = [...new Set(orders.map((o) => o.ordered_by))];
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .in("id", ids);
-    for (const p of profiles ?? [])
-      names.set(p.id, p.full_name ?? p.email ?? "Teamlid");
-  }
+  const scope: OverviewScope = viewAll
+    ? { mode: "company", companyId: user.companyId, userId: user.id }
+    : { mode: "own", companyId: user.companyId, userId: user.id, member: isMember(user) };
+  const data = await loadOverview(scope, query);
+  const bestelling = typeof sp.bestelling === "string" && UUID.test(sp.bestelling) ? sp.bestelling : null;
 
   return (
-    <div>
-      <PageHeader
-        title="Bestellingen"
-        description={
-          viewAll
-            ? "Alle bestellingen van je bedrijf."
-            : "Jouw bestelgeschiedenis."
-        }
-      />
-
-      {orders.length === 0 ? (
-        <EmptyState
-          icon={ClipboardList}
-          title="Nog geen bestellingen"
-          description="Bestellingen die je plaatst verschijnen hier."
-        />
-      ) : (
-        <ul className="space-y-2">
-          {orders.map((o) => {
-            const status = ORDER_STATUS[o.status] ?? {
-              label: o.status,
-              tone: "neutral" as const,
-            };
-            const totalQty = o.items.reduce((s, i) => s + i.quantity, 0);
-            return (
-              <li key={o.id}>
-                <Link
-                  href={`/orders/${o.id}`}
-                  className="flex items-center justify-between gap-3 rounded-xl border bg-card p-4 transition hover:border-foreground/20"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">
-                        {o.order_number ?? "Bestelling"}
-                      </span>
-                      <StatusBadge tone={status.tone}>
-                        {status.label}
-                      </StatusBadge>
-                    </div>
-                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                      {viewAll ? `${names.get(o.ordered_by) ?? "Teamlid"} · ` : ""}
-                      {totalQty} artikel{totalQty === 1 ? "" : "en"} ·{" "}
-                      {formatDate(o.created_at)}
-                    </p>
-                  </div>
-                  {display !== "hidden" ? (
-                    <span className="shrink-0 font-medium">
-                      {formatValue(Number(o.total), Number(o.credit_total ?? 0), display)}
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+    <OrdersWorkspace
+      data={data}
+      query={query}
+      basePath="/orders"
+      detailBase="/orders/"
+      title={viewAll ? "Bestellingen" : "Mijn bestellingen"}
+      description={
+        viewAll
+          ? `Wie wat heeft besteld bij ${user.company?.name ?? "je bedrijf"}, per periode.`
+          : "Alles wat je hebt besteld, met de status van elke bestelling."
+      }
+      canApprove={can(user, "orders.approve")}
+      scopeKey={savedViewScope(scope)}
+      initialOrderId={bestelling}
+    />
   );
 }

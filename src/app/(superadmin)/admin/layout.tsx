@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const NAV: SidebarNavItem[] = [
   { href: "/admin", label: "Overzicht", icon: "dashboard", group: "Werk" },
+  { href: "/admin/bestellingen", label: "Bestellingen", icon: "orders", group: "Werk" },
   { href: "/admin/orders", label: "Productie", icon: "production", group: "Werk" },
   { href: "/admin/companies", label: "Bedrijven", icon: "companies", group: "Werk" },
   { href: "/admin/catalog", label: "Catalogus", icon: "catalog", group: "Werk" },

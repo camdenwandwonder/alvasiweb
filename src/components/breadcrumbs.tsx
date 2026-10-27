@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   categories: "Categorieën",
   options: "Opties & maten",
   orders: "Bestellingen",
+  bestellingen: "Bestellingen",
   reports: "Rapportages",
   account: "Account",
   new: "Nieuw",

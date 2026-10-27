@@ -81,6 +81,10 @@ export default async function ReportsPage() {
       </Card>
 
       <p className="mt-4 text-xs text-muted-foreground">
+        <Link href="/admin/bestellingen" className="hover:underline">
+          Zoek en filter alle bestellingen →
+        </Link>
+        <span className="mx-2">·</span>
         <Link href="/admin/orders" className="hover:underline">
           Bekijk de productie →
         </Link>
