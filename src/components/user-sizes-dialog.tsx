@@ -25,23 +25,39 @@ export function UserSizesDialog({
   userName,
   sizeSets,
   current,
+  iconOnly = false,
 }: {
   userId: string;
   userName: string;
   sizeSets: SizeSet[];
   current: Record<string, string>;
+  iconOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   if (sizeSets.length === 0) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>
-        <Ruler className="h-3.5 w-3.5" /> Maten
+      <DialogTrigger
+        render={
+          iconOnly ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Standaardmaten"
+              title="Standaardmaten"
+            />
+          ) : (
+            <Button variant="outline" size="sm" />
+          )
+        }
+      >
+        <Ruler className="h-4 w-4" />
+        {iconOnly ? null : " Maten"}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Standaardmaten — {userName}</DialogTitle>
+          <DialogTitle>Standaardmaten van {userName}</DialogTitle>
         </DialogHeader>
         <p className="mb-3 text-sm text-muted-foreground">
           Stel de vaste maten in. Bij het bestellen worden deze automatisch

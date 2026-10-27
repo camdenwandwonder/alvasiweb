@@ -38,10 +38,11 @@ import type { BudgetMode } from "@/lib/allowance";
 import { getIntegration } from "@/lib/jamespro/sync";
 import { CompanyMedia } from "./company-media";
 import { CompanyJamespro } from "./company-jamespro";
-import { UserSizesDialog, type SizeSet } from "@/components/user-sizes-dialog";
+import type { SizeSet } from "@/components/user-sizes-dialog";
+import { UsersManager } from "@/components/users-manager";
+import { getCurrentUser } from "@/lib/auth/user";
 import { formatPrice } from "@/lib/format";
 import {
-  createCompanyUser,
   updateCompany,
   deleteCompany,
   setCompanyCategoryVisibility,
@@ -61,6 +62,7 @@ export default async function CompanyDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const me = await getCurrentUser();
   const admin = createAdminClient();
 
   const { data: company } = await admin
@@ -99,7 +101,7 @@ export default async function CompanyDetailPage({
       .order("name"),
     admin
       .from("profiles")
-      .select("id, full_name, email, status, sizes, role:roles(name)")
+      .select("id, full_name, email, status, sizes, role_id")
       .eq("company_id", id)
       .order("created_at", { ascending: false }),
     admin
@@ -316,87 +318,23 @@ export default async function CompanyDetailPage({
 
         {/* Gebruikers */}
         <TabsContent value="users" className="mt-4">
-          <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-            <div>
-              {userList.length === 0 ? (
-                <EmptyState icon={Users} title="Nog geen gebruikers" />
-              ) : (
-                <ul className="space-y-2">
-                  {userList.map((u) => (
-                    <li
-                      key={u.id}
-                      className="flex items-center justify-between rounded-xl border bg-card p-4"
-                    >
-                      <div>
-                        <p className="font-medium">{u.full_name ?? u.email}</p>
-                        <p className="text-xs text-muted-foreground">{u.email}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <UserSizesDialog
-                          userId={u.id}
-                          userName={u.full_name ?? u.email ?? "Gebruiker"}
-                          sizeSets={(sizeSets ?? []) as unknown as SizeSet[]}
-                          current={
-                            (u.sizes as Record<string, string> | null) ?? {}
-                          }
-                        />
-                        <Badge variant="secondary">
-                          {(u.role as unknown as { name: string } | null)
-                            ?.name ?? "Geen rol"}
-                        </Badge>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <Card className="h-fit">
-              <CardHeader>
-                <CardTitle className="text-base">Gebruiker toevoegen</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!roles || roles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Standaardrollen worden aangemaakt. Ververs zo even.
-                  </p>
-                ) : (
-                  <form
-                    action={createCompanyUser.bind(null, company.id)}
-                    className="space-y-3"
-                  >
-                    <Field label="Volledige naam">
-                      <Input name="full_name" placeholder="Jan Jansen" />
-                    </Field>
-                    <Field label="E-mailadres">
-                      <Input name="email" type="email" required />
-                    </Field>
-                    <Field label="Tijdelijk wachtwoord">
-                      <Input name="password" type="text" required minLength={6} />
-                    </Field>
-                    <Field label="Rol">
-                      <NativeSelect name="role_id" required defaultValue="">
-                        <option value="" disabled>
-                          Kies een rol…
-                        </option>
-                        {roles.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                            {r.requires_order_approval
-                              ? " (goedkeuring vereist)"
-                              : ""}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                    </Field>
-                    <SubmitButton className="w-full">
-                      Gebruiker aanmaken
-                    </SubmitButton>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <UsersManager
+            companyId={company.id}
+            users={userList.map((u) => ({
+              id: u.id,
+              full_name: u.full_name,
+              email: u.email,
+              status: u.status,
+              role_id: u.role_id,
+              sizes: (u.sizes as Record<string, string> | null) ?? null,
+            }))}
+            roles={roleList.map((r) => ({ id: r.id, name: r.name }))}
+            sizeSets={(sizeSets ?? []) as unknown as SizeSet[]}
+            currentUserId={me?.id ?? ""}
+            canInvite
+            canUpdate
+            canRemove
+          />
         </TabsContent>
 
         {/* Zichtbaarheid */}
