@@ -58,6 +58,11 @@ export function ShopView({
     [data.products, favs],
   );
 
+  const favoritesOnLoad = useMemo(
+    () => new Set(data.products.filter((p) => p.favorite).map((p) => p.id)),
+    [data.products],
+  );
+
   const sizeOptions = useMemo(() => {
     const seen: string[] = [];
     for (const p of products) if (p.sizes.length > 1) for (const s of p.sizes) if (!seen.includes(s)) seen.push(s);
@@ -127,8 +132,12 @@ export function ShopView({
         (!size || p.sizes.length <= 1 || p.sizes.includes(size)),
     );
     const byName = (a: ShopProduct, b: ShopProduct) => a.name.localeCompare(b.name, "nl");
+    // Favourites as they were on load, so marking one doesn't make it jump.
     const score = (p: ShopProduct) =>
-      (p.roleKind ? 8 : 0) + (p.favorite ? 4 : 0) + (p.lastOrdered ? 2 : 0) + (p.isNew ? 1 : 0);
+      (p.roleKind ? 8 : 0) +
+      (favoritesOnLoad.has(p.id) ? 4 : 0) +
+      (p.lastOrdered ? 2 : 0) +
+      (p.isNew ? 1 : 0);
     return [...list].sort((a, b) =>
       sort === "naam"
         ? byName(a, b)
@@ -139,7 +148,7 @@ export function ShopView({
             : score(b) - score(a) || byName(a, b),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, q, category, size, sort, priced]);
+  }, [products, q, category, size, sort, priced, favoritesOnLoad]);
 
   const counts = useMemo(() => {
     const base = products.filter((p) => matches(p) && (!size || p.sizes.length <= 1 || p.sizes.includes(size)));

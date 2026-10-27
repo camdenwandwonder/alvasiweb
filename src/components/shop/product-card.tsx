@@ -183,7 +183,7 @@ export function ProductCard({
   return (
     <article
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border bg-card transition hover:border-foreground/20 hover:shadow-md",
+        "group relative isolate flex flex-col overflow-hidden rounded-xl border bg-card transition hover:border-foreground/20 hover:shadow-md",
         mode !== "grid" && "w-[200px] shrink-0 sm:w-[220px]",
       )}
     >
