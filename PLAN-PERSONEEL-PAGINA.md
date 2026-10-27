@@ -3,6 +3,8 @@
 Status: **plan, nog niet gebouwd.** Doel: de vier beheerpagina's **Personeel, Rollen,
 Regels & budget en Zichtbaarheid** samenvoegen tot één pagina waarop een manager in één
 oogopslag ziet en regelt *wie wat mag bestellen, hoeveel, en wat hij te zien krijgt*.
+Plus een helder prijsmodel: euro, credits of aantallen per product, met een duidelijke
+rekenregel tussen de europrijs van Alvasi en de credits van de medewerker (§5).
 
 ---
 
@@ -170,7 +172,149 @@ Veiligheid:
 
 ---
 
-## 5. Extra functionaliteit (geprioriteerd)
+## 5. Prijzen, credits en aantallen
+
+Alvasi (superadmin) zet per organisatie de producten klaar met een **europrijs**. Dat
+blijft altijd de basis: de factuur en de JamesPRO-koppeling werken in euro's. De
+manager bepaalt alleen hoe medewerkers dat **ervaren**.
+
+### 5.1 Wat er nu mis is
+
+- **Credits staan los van de europrijs.** Alvasi vult per product handmatig een
+  creditwaarde in. Vergeet Alvasi dat, dan kost het product **0 credits** en is het in
+  credit-modus onbeperkt gratis te bestellen.
+- **De manager kan niets met credits.** Hij zet de modus aan, maar de creditprijzen en de
+  verhouding tot de euro bepaalt alleen Alvasi; een rekenregel bestaat niet.
+- **Credits negeren prijsverschillen per variant** (bijvoorbeeld een duurdere XXL).
+- **Aantallen-modus toont nooit een prijs**, en producten zonder limiet zijn zonder
+  waarschuwing onbeperkt te bestellen.
+- **De drie modi sluiten elkaar uit.** "€ 500 per jaar én maximaal 2 jassen" kan niet,
+  terwijl dat in uniformprogramma's juist gebruikelijk is. Bij wisselen van modus worden
+  bestaande budgetten van de andere soort stil genegeerd.
+
+### 5.2 Wat het onderzoek laat zien
+
+- **Uniformprogramma's** werken met een eurobudget, met vaste **punten per artikel**
+  (Gemeente Vught: T-shirt = 1 punt, nieuwe medewerker 64 punten, daarna 34 per jaar),
+  of met **aantallen per functie** ("2 shirts per 2 maanden, 1 jas per 2 jaar",
+  UniformMarket). Aantallen worden daar **gecombineerd** met een budget, niet als
+  aparte modus.
+- **Puntenplatforms** (Bonusly, Perkbox, Reward Gateway) gebruiken een **vaste koers**
+  (bijv. £ 1 = 10 punten) en raden eenvoudige verhoudingen aan.
+- **Medewerkers zien in een creditprogramma nooit euro's**: wie beide ziet, rekent de
+  koers terug en het idee van credits verdwijnt. Managers zien wel beide.
+- **Valkuilen:** halve credits, **stille devaluatie** (prijsstijging die ongemerkt de
+  creditprijs verhoogt, een bekende klacht bij Workhuman), en heel grote getallen
+  (duizenden punten maken mensen terughoudend met besteden). Kies tientallen tot lage
+  honderden per periode.
+
+Bronnen: UniformMarket, Gemeente Vught (kledingregeling), Bonusly, Perkbox, Reward
+Gateway, Adobe Commerce reward points, MangoApps, Mater Health, Workhuman-reviews
+(onderzoek 27-10-2026).
+
+### 5.3 Het nieuwe model: twee losse keuzes
+
+In plaats van drie elkaar uitsluitende modi kiest de manager **twee dingen
+onafhankelijk** van elkaar:
+
+**Keuze 1: Hoe betalen medewerkers?** (één optie)
+
+| Optie | Medewerker ziet | Budget per periode |
+|---|---|---|
+| **Geen budget** (bedrijf betaalt alles) | Prijs aan/uit (instelbaar) | Geen |
+| **Budget in euro** | Europrijzen | In euro's |
+| **Budget in credits** | Alleen credits | In credits |
+
+**Keuze 2: Maximaal aantal per product** (aan/uit, combineerbaar met elk van de drie)
+
+- Per functie (en als uitzondering per persoon): "Jas: max 2 per jaar".
+- Instelbaar wat er gebeurt met **producten zonder limiet**: vrij te bestellen, of niet
+  te bestellen. (Nu: stilzwijgend onbeperkt.)
+- Bij **Geen budget + aantallen** bepaalt de manager met een schakelaar of de prijs
+  naast "Nog 1 van 2 dit jaar" getoond wordt. Standaard uit; aanzetten geeft
+  kostenbewustzijn. Bij een budget wordt de prijs altijd getoond in de eenheid van het
+  budget (anders kan iemand zijn budget niet beoordelen).
+- Is het maximum bereikt, dan wordt de knop **"Aanvragen"** (bestaande aanvraagflow
+  met reden en goedkeuring).
+
+Je huidige opties blijven zo allemaal mogelijk: euro = "Budget in euro", credits =
+"Budget in credits", aantallen = "Geen budget + aantallen". Bestaande instellingen
+worden automatisch omgezet.
+
+### 5.4 Hoe credits berekend worden (de rekenregel)
+
+**Eén koers per organisatie**, ingesteld door de manager: **1 credit = € X**.
+
+1. **Creditprijs = europrijs ÷ koers, naar boven afgerond op hele credits.**
+   Per variant, dus een duurdere XXL kost ook meer credits. Een regel kost
+   aantal × creditprijs per stuk (nooit het regeltotaal apart afronden).
+   Belofte aan de klant: N credits kosten nooit meer dan N × € X.
+2. **De manager kan per product een eigen creditprijs zetten** (bijv. "alle shirts 25
+   credits"). Zo'n product krijgt het label *handmatig*; de rest volgt de koers.
+3. **Creditprijzen staan vast** tot de manager ze bijwerkt. Verandert Alvasi een
+   europrijs, dan ziet de manager een melding ("Jas: € 99 → € 109, voorstel 99 → 109
+   credits") en kiest *nu bijwerken* of *laten staan*. **Nooit stil bijwerken.**
+4. **Koers wijzigen** toont eerst een voorbeeld: alle creditprijzen en budgetten worden
+   in één keer omgerekend zodat de **eurowaarde gelijk blijft** (budget Monteur
+   500 → 1.000 credits bij halvering van de koers). Al geplaatste bestellingen houden
+   hun eigen waarde, omdat elke bestelling de koers van dat moment vastlegt.
+5. **De app stelt een verstandige koers voor**: zo dat de afronding bij het goedkoopste
+   product onder ~5% blijft, en budgetten in tientallen tot honderden credits uitkomen.
+   Bijvoorbeeld 1 credit = € 1 bij producten vanaf € 20.
+
+**Wat wordt opgeslagen**
+- Creditbudgetten in **hele credits**; eurobudgetten in euro's.
+- Elke bestelregel bewaart een momentopname: creditprijs, europrijs en koers. Een
+  geannuleerde of afgewezen bestelling telt niet meer mee; het budget komt vanzelf terug.
+- De factuur aan de organisatie blijft in euro's, met optioneel een creditkolom.
+
+**Wie ziet wat**
+- **Medewerker (credits):** overal alleen credits: winkel, winkelwagen, bestelling,
+  e-mails. De budgetbalk toont "320 van 500 credits over, reset 1 januari".
+- **Manager:** beide, ook in goedkeuringen en rapportages ("120 credits · € 120").
+- **Alvasi/superadmin:** altijd euro's, credits als extra informatie.
+
+### 5.5 Waar de manager dit instelt
+
+In de popup achter **Bestelregels** (de balk bovenaan Personeel), in drie stappen:
+
+```
+┌─ Bestelregels ─────────────────────────────────────────────────────┐
+│ 1  Hoe betalen medewerkers?                                        │
+│    ( ) Geen budget   ( ) Budget in euro   (•) Budget in credits    │
+│                                                                    │
+│ 2  Creditkoers   1 credit = € [1,00]   (voorstel: € 1,00)          │
+│    Rekenvoorbeeld met jullie producten:                            │
+│    Jas Verkoop Printer   € 99,00  →  99 credits                    │
+│    Werkplaats T-shirt    € 24,95  →  25 credits  (afgerond)        │
+│    Iemand met 500 credits kan bijv. 2 jassen + 3 shirts (273)      │
+│    [Alle creditprijzen bekijken en aanpassen]                      │
+│                                                                    │
+│ 3  Maximaal aantal per product      [aan]                          │
+│    Producten zonder limiet:  (•) vrij bestellen  ( ) niet bestelbaar│
+│    Prijs tonen naast "nog X over":  [uit]  (alleen bij Geen budget) │
+│                                                                    │
+│    Goedkeuring nodig boven  [ 250 ] credits                         │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+- **Budgetten en maxima per functie** stel je in bij de functie (tabblad Functies),
+  uitzonderingen bij de persoon. De popup bevat alleen wat voor de hele organisatie geldt.
+- Het **rekenvoorbeeld** gebruikt de echte producten van de organisatie, zodat de
+  manager direct ziet wat de koers betekent.
+- De goedkeuringsdrempel volgt de gekozen eenheid (euro of credits).
+
+### 5.6 Rol van Alvasi (superadmin)
+
+- Zet producten en **europrijzen** klaar (ongewijzigd). Het losse veld
+  "creditprijs" in de producteditor verdwijnt: credits worden automatisch afgeleid.
+- Kan bij een organisatie dezelfde Bestelregels-popup openen om het voor de klant in te
+  richten (bijv. bij de start).
+- Ziet in de productie en rapportages altijd euro's.
+
+---
+
+## 6. Extra functionaliteit (geprioriteerd)
 
 **Nu meebouwen (maakt het verschil)**
 1. "Wat kan Jan?"-samenvatting met herkomst per regel.
@@ -181,7 +325,7 @@ Veiligheid:
 6. **"Bekijk de winkel als Jan"**: alleen-lezen voorbeeld van wat Jan ziet en wat
    goedkeuring nodig heeft.
 
-**Daarna (fase 4, los te kiezen)**
+**Daarna (fase 5, los te kiezen)**
 7. **Meer budget aanvragen** vanuit de winkel, met goedkeuren in één klik.
 8. **Welkomstpakket** per functie: eenmalig budget of producten bij indiensttreding,
    plus verzoek om maten in te vullen.
@@ -195,7 +339,7 @@ Veiligheid:
 
 ---
 
-## 6. Technische aanpak
+## 7. Technische aanpak
 
 - **Route:** nieuwe pagina `/personeel` met `?tab=medewerkers|functies` en
   `&id=…` voor het open paneel (deelbaar, terugknop werkt). Oude routes
@@ -210,9 +354,23 @@ Veiligheid:
   - `saveRole(roleId, …)`: rechten, goedkeuring, budget en catalogus in één keer.
   - `reassignAndDeleteRole(roleId, targetRoleId)`.
   - Schuifpaneel-component (de Sheet uit de bestaande sidebar-bibliotheek).
-- **Database:** de kernversie heeft **geen migratie** nodig. De "Alle categorieën"-keuze
-  blijft opgeslagen als "geen regels". Alleen extra's (geschiedenis, aanvragen,
-  welkomstpakket) vragen later een migratie.
+- **Database:** fase 1 en 2 hebben **geen migratie** nodig. De "Alle categorieën"-keuze
+  blijft opgeslagen als "geen regels". Het nieuwe prijsmodel (§5) vraagt één migratie:
+  - Organisatie-instellingen: `payment_mode` (geen / euro / credits), `credit_rate`,
+    `caps_enabled`, `uncapped_products` (vrij / geblokkeerd), `show_price_with_caps`.
+    Bestaande `budget_mode` wordt automatisch omgezet (euro → euro, credits → credits,
+    aantallen → geen budget + aantallen).
+  - `products.credit_cost` wordt de vastgezette creditprijs (hele credits) +
+    `credit_cost_manual` (handmatig of volgt koers); `product_variants.credit_cost`
+    voor varianten met een eigen prijs.
+  - Momentopname van de koers op elke bestelling (`orders.credit_rate`), zodat
+    budgetverbruik na een koerswijziging juist blijft.
+  - Extra's (geschiedenis, aanvragen, welkomstpakket) vragen later een eigen migratie.
+- **Bestel- en budgetlogica (§5):** `getAllowance` wordt opgesplitst in *betaling*
+  (budget in euro of credits) en *maxima per product*, die allebei tegelijk kunnen
+  gelden. Afrekenen controleert beide; overschrijding blijft een aanvraag met reden.
+  Creditprijzen worden server-side berekend en vastgelegd, nooit van de browser
+  vertrouwd. Het 0-credits-gat verdwijnt doordat elke prijs een creditprijs heeft.
 - **Superadmin:** dezelfde component komt in Bedrijven → bedrijf; de tabbladen
   *Gebruikers*, *Zichtbaarheid* en *Bestelwijze* worden één tabblad *Personeel*.
 - **Mobiel:** paneel schermvullend; lijst wordt kaarten.
@@ -221,22 +379,30 @@ Veiligheid:
 
 ---
 
-## 7. Bouwvolgorde (elke fase live en controleerbaar)
+## 8. Bouwvolgorde (elke fase live en controleerbaar)
 
 | Fase | Inhoud | Controle |
 |---|---|---|
 | **1** | Groter, gegroepeerd menu; pagina `/personeel` met Bestelregels-balk, tab Medewerkers met filters, budgetbalken en schuifpaneel; doorverwijzingen | Manager-menu heeft 8 items; Jan openen toont "Wat kan Jan?" met juiste budget |
 | **2** | Tab Functies: kaarten, paneel met sjablonen, schakelaars in gewone taal, budget, catalogus, medewerkers; veilig verwijderen; wijzigingsvoorbeeld | Functie aanpassen → kaart en medewerkerlijst kloppen direct |
-| **3** | Bulkacties, "Bekijk de winkel als", functies vergelijken, superadmin-hergebruik | Superadmin ziet dezelfde Personeel-tab bij een bedrijf |
-| **4** | Keuze uit de extra's van §5 | Per onderdeel |
+| **3** | Nieuw prijsmodel (§5): betaling + maxima los van elkaar, creditkoers met rekenvoorbeeld, creditprijzen per variant, prijs-schakelaar bij aantallen, wijzigingsvoorbeeld bij koers- en prijswijziging; migratie + omzetting bestaande instellingen | Koers € 1 → shirt € 24,95 toont 25 credits; "€ 500 én max 2 jassen" werkt samen; medewerker in credit-modus ziet nergens euro's |
+| **4** | Bulkacties, "Bekijk de winkel als", functies vergelijken, superadmin-hergebruik | Superadmin ziet dezelfde Personeel-tab bij een bedrijf |
+| **5** | Keuze uit de extra's van §6 | Per onderdeel |
 
 ---
 
-## 8. Beslissingen voor Camden
+## 9. Beslissingen voor Camden
 
 1. **Naam van de rollen:** "Functies" (begrijpelijker voor een monteur of verkoper) of
    "Rollen" laten staan? Advies: **Functies**.
 2. **Budget per functie, uitzondering per persoon** als vaste regel? Advies: **ja**.
 3. **Bestelregels als balk** bovenaan in plaats van een eigen tab? Advies: **ja**.
-4. **Welke extra's uit fase 4** wil je, en in welke volgorde?
-5. **Wachtwoord:** handmatig blijven instellen, of (later) resetten via een e-maillink?
+4. **Prijsmodel (§5): betaling en maxima als twee losse keuzes**, zodat "budget én
+   maximaal 2 jassen" kan? Advies: **ja**.
+5. **Credits afgeleid van een koers**, met handmatige uitzondering per product, in
+   plaats van losse creditwaarden die Alvasi per product invult? Advies: **ja**.
+6. **Producten zonder limiet** (bij maxima per product): standaard vrij te bestellen of
+   niet bestelbaar? Advies: **vrij**, met een duidelijke instelling.
+7. **Prijs bij aantallen:** standaard verbergen (aanzetbaar per organisatie)? Advies: **ja**.
+8. **Welke extra's uit fase 5** wil je, en in welke volgorde?
+9. **Wachtwoord:** handmatig blijven instellen, of (later) resetten via een e-maillink?
