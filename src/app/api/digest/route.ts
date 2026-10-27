@@ -21,11 +21,11 @@ function list(title: string, rows: string[]): string {
  * Monthly summary for each company's managers (everyone whose functie may
  * view the personnel): who is close to their budget, who never ordered, who
  * has no sizes yet, and how many budget requests wait. Called by the Vercel
- * cron; protected by CRON_SECRET when set. A no-op without e-mail configured.
+ * cron; refuses to run without CRON_SECRET. A no-op without e-mail configured.
  */
 async function handle(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
