@@ -6,13 +6,13 @@ import type { SidebarNavItem } from "@/components/app-sidebar";
 export const dynamic = "force-dynamic";
 
 const NAV: SidebarNavItem[] = [
-  { href: "/admin", label: "Overzicht", icon: "dashboard" },
-  { href: "/admin/companies", label: "Bedrijven", icon: "companies" },
-  { href: "/admin/catalog", label: "Catalogus", icon: "catalog" },
-  { href: "/admin/orders", label: "Productie", icon: "production" },
-  { href: "/admin/reports", label: "Rapportages", icon: "reports" },
-  { href: "/admin/integrations", label: "Integraties", icon: "integrations" },
-  { href: "/admin/config", label: "Configuratie", icon: "settings" },
+  { href: "/admin", label: "Overzicht", icon: "dashboard", group: "Werk" },
+  { href: "/admin/orders", label: "Productie", icon: "production", group: "Werk" },
+  { href: "/admin/companies", label: "Bedrijven", icon: "companies", group: "Werk" },
+  { href: "/admin/catalog", label: "Catalogus", icon: "catalog", group: "Werk" },
+  { href: "/admin/reports", label: "Rapportages", icon: "reports", group: "Systeem" },
+  { href: "/admin/integrations", label: "Integraties", icon: "integrations", group: "Systeem" },
+  { href: "/admin/config", label: "Configuratie", icon: "settings", group: "Systeem" },
 ];
 
 export default async function AdminLayout({

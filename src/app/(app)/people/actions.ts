@@ -33,7 +33,7 @@ export async function setUserSizes(userId: string, formData: FormData) {
   }
 
   await admin.from("profiles").update({ sizes }).eq("id", userId);
-  revalidatePath("/people");
+  revalidatePath("/personeel");
   if (target.company_id)
     revalidatePath(`/admin/companies/${target.company_id}`);
 }

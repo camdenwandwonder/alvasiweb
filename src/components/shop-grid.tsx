@@ -7,60 +7,60 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/primitives";
 import { ProductThumb } from "@/components/product-thumb";
 import { AddToCart } from "@/components/add-to-cart";
-import { formatPrice } from "@/lib/format";
-import type { BudgetMode } from "@/lib/allowance";
+import { formatValue, PERIOD_LABEL, type Display, type Period } from "@/lib/ordering";
+import type { ShopProduct } from "@/lib/shop";
 
-export type ShopVariant = {
-  id: string;
-  attributes: Record<string, unknown>;
-  price_override: number | null;
-};
-export type ShopProduct = {
-  id: string;
-  name: string;
-  description: string | null;
-  base_price: number | null;
-  credit_cost: number | null;
-  category_id: string | null;
-  category_name: string | null;
-  variants: ShopVariant[];
-  images: { url: string; is_primary: boolean }[];
-};
+export type { ShopProduct };
+
+function CapBadge({ cap }: { cap: NonNullable<ShopProduct["cap"]> }) {
+  const period = PERIOD_LABEL[cap.period as Period] ?? "";
+  if (cap.remaining <= 0)
+    return (
+      <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+        Maximum bereikt — aanvragen kan
+      </span>
+    );
+  return (
+    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
+      Nog {cap.remaining} van {cap.max} {period}
+    </span>
+  );
+}
 
 export function ShopGrid({
   products,
   categories,
+  display,
   canOrder,
-  mode = "euro",
-  perProduct,
   preferredSizes = [],
+  preview = false,
 }: {
   products: ShopProduct[];
   categories: { id: string; name: string }[];
+  display: Display;
   canOrder: boolean;
-  mode?: BudgetMode;
-  perProduct?: Record<string, { max: number; used: number; remaining: number }>;
   preferredSizes?: string[];
+  preview?: boolean;
 }) {
-  function priceLabel(p: ShopProduct): React.ReactNode {
-    if (mode === "credits")
-      return (
-        <span className="text-sm font-medium">
-          {p.credit_cost ?? 0} credits
-        </span>
-      );
-    if (mode === "quantity") {
-      const q = perProduct?.[p.id];
-      if (!q) return <span className="text-xs text-muted-foreground">—</span>;
-      return (
-        <span className="text-xs font-medium">
-          {q.remaining}/{q.max} over
-        </span>
-      );
-    }
-    return (
-      <span className="text-sm font-medium">{formatPrice(p.base_price)}</span>
+  const priced = display !== "hidden";
+  const unitValue = (p: ShopProduct) => (display === "credits" ? p.credits : p.euro);
+
+  function priceLabel(p: ShopProduct): string {
+    if (!priced) return "";
+    // "vanaf" when variants are priced differently (e.g. a pricier XXL).
+    const cheapest = p.variants.length
+      ? p.variants.reduce((m, v) => (unitValueOf(v) < unitValueOf(m) ? v : m))
+      : null;
+    const differ = p.variants.some(
+      (v) => v.euro !== p.variants[0].euro || v.credits !== p.variants[0].credits,
     );
+    if (cheapest && differ)
+      return `vanaf ${formatValue(cheapest.euro, cheapest.credits, display)}`;
+    const ref = cheapest ?? { euro: p.euro, credits: p.credits };
+    return formatValue(ref.euro, ref.credits, display);
+  }
+  function unitValueOf(v: { euro: number; credits: number }) {
+    return display === "credits" ? v.credits : v.euro;
   }
 
   const [query, setQuery] = useState("");
@@ -78,13 +78,14 @@ export function ShopGrid({
       );
     if (categoryId) list = list.filter((p) => p.category_id === categoryId);
     list = [...list].sort((a, b) => {
-      if (sort === "name") return a.name.localeCompare(b.name);
-      const val = (p: ShopProduct) =>
-        mode === "credits" ? (p.credit_cost ?? 0) : (p.base_price ?? 0);
-      return sort === "price-asc" ? val(a) - val(b) : val(b) - val(a);
+      if (sort === "name" || !priced) return a.name.localeCompare(b.name);
+      return sort === "price-asc"
+        ? unitValue(a) - unitValue(b)
+        : unitValue(b) - unitValue(a);
     });
     return list;
-  }, [products, query, categoryId, sort, mode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, query, categoryId, sort, display]);
 
   return (
     <div>
@@ -102,7 +103,7 @@ export function ShopGrid({
           <NativeSelect
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
-            className="h-9 w-auto"
+            className="w-auto"
           >
             <option value="">Alle categorieën</option>
             {categories.map((c) => (
@@ -112,15 +113,17 @@ export function ShopGrid({
             ))}
           </NativeSelect>
         ) : null}
-        <NativeSelect
-          value={sort}
-          onChange={(e) => setSort(e.target.value as typeof sort)}
-          className="h-9 w-auto"
-        >
-          <option value="name">Sorteer: naam</option>
-          <option value="price-asc">Prijs: laag → hoog</option>
-          <option value="price-desc">Prijs: hoog → laag</option>
-        </NativeSelect>
+        {priced ? (
+          <NativeSelect
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            className="w-auto"
+          >
+            <option value="name">Sorteer: naam</option>
+            <option value="price-asc">Prijs: laag → hoog</option>
+            <option value="price-desc">Prijs: hoog → laag</option>
+          </NativeSelect>
+        ) : null}
       </div>
 
       {shown.length === 0 ? (
@@ -128,54 +131,69 @@ export function ShopGrid({
           <Package className="mb-3 h-6 w-6 text-muted-foreground" />
           <p className="font-medium">Geen producten gevonden</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pas je zoekopdracht of filter aan.
+            {products.length === 0
+              ? "Er zijn (nog) geen producten beschikbaar."
+              : "Pas je zoekopdracht of filter aan."}
           </p>
         </div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {shown.map((p) => (
-            <Card key={p.id} className="group flex flex-col overflow-hidden p-0">
-              <ProductThumb
-                images={p.images ?? []}
-                alt={p.name}
-                className="aspect-square w-full"
-              />
-              <div className="flex flex-1 flex-col p-5">
-                <div className="flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-medium">{p.name}</h3>
-                    <span className="shrink-0">{priceLabel(p)}</span>
+          {shown.map((p) => {
+            const price = priceLabel(p);
+            return (
+              <Card key={p.id} className="group flex flex-col overflow-hidden p-0">
+                <ProductThumb
+                  images={p.images ?? []}
+                  alt={p.name}
+                  className="aspect-square w-full"
+                />
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-medium">{p.name}</h3>
+                      {price ? (
+                        <span className="shrink-0 text-sm font-medium">{price}</span>
+                      ) : null}
+                    </div>
+                    {p.category_name ? (
+                      <p className="text-xs text-muted-foreground">
+                        {p.category_name}
+                      </p>
+                    ) : null}
+                    {p.cap ? (
+                      <div className="mt-2">
+                        <CapBadge cap={p.cap} />
+                      </div>
+                    ) : null}
+                    {p.description ? (
+                      <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                        {p.description}
+                      </p>
+                    ) : null}
                   </div>
-                  {p.category_name ? (
-                    <p className="text-xs text-muted-foreground">
-                      {p.category_name}
-                    </p>
-                  ) : null}
-                  {p.description ? (
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                      {p.description}
-                    </p>
+                  {canOrder || preview ? (
+                    <div className="mt-4">
+                      <AddToCart
+                        productId={p.id}
+                        name={p.name}
+                        euro={p.euro}
+                        credits={p.credits}
+                        image={
+                          p.images?.find((i) => i.is_primary)?.url ??
+                          p.images?.[0]?.url ??
+                          null
+                        }
+                        variants={p.variants}
+                        display={display}
+                        preferredSizes={preferredSizes}
+                        preview={preview}
+                      />
+                    </div>
                   ) : null}
                 </div>
-                {canOrder ? (
-                  <div className="mt-4">
-                    <AddToCart
-                      productId={p.id}
-                      name={p.name}
-                      basePrice={p.base_price}
-                      image={
-                        p.images?.find((i) => i.is_primary)?.url ??
-                        p.images?.[0]?.url ??
-                        null
-                      }
-                      variants={p.variants ?? []}
-                      preferredSizes={preferredSizes}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

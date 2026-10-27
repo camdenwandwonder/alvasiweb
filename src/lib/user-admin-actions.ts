@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
+import { logAudit } from "@/lib/company-gate";
+import { formatAmount, readOrderingSettings } from "@/lib/ordering";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -41,7 +43,7 @@ async function roleBelongsTo(roleId: string, companyId: string) {
 }
 
 function refresh(companyId: string) {
-  revalidatePath("/people");
+  revalidatePath("/personeel");
   revalidatePath(`/admin/companies/${companyId}`);
 }
 
@@ -53,8 +55,8 @@ export async function createCompanyUser(
   companyId: string,
   fd: FormData,
 ): Promise<Result> {
-  if (!(await gate(companyId, "users.invite")))
-    return { ok: false, error: "Geen toegang" };
+  const actor = await gate(companyId, "users.invite");
+  if (!actor) return { ok: false, error: "Geen toegang" };
 
   const email = text(fd, "email").toLowerCase();
   const password = String(fd.get("password") ?? "");
@@ -99,6 +101,40 @@ export async function createCompanyUser(
     await admin.auth.admin.deleteUser(created.user.id);
     return { ok: false, error: pErr.message };
   }
+
+  // Welkomstpakket: a one-off budget from the functie for new people.
+  const [{ data: role }, { data: company }] = await Promise.all([
+    admin.from("roles").select("name, welcome_amount").eq("id", roleId).maybeSingle(),
+    admin.from("companies").select("settings").eq("id", companyId).maybeSingle(),
+  ]);
+  const ordering = readOrderingSettings(company?.settings as Record<string, unknown>);
+  const welcome = Number(role?.welcome_amount ?? 0);
+  if (welcome > 0 && ordering.payment !== "none") {
+    await admin.from("budget_requests").insert({
+      company_id: companyId,
+      user_id: created.user.id,
+      kind: "welcome",
+      unit: ordering.payment === "credits" ? "credits" : "euro",
+      amount: welcome,
+      reason: `Welkomstpakket ${role?.name ?? ""}`.trim(),
+      status: "approved",
+      decided_by: actor.id,
+      decided_at: new Date().toISOString(),
+    });
+  }
+
+  await logAudit({
+    companyId,
+    actor,
+    targetType: "user",
+    targetId: created.user.id,
+    action: "aangemaakt",
+    summary: `${fullName ?? email} toegevoegd als ${role?.name ?? "medewerker"}${
+      welcome > 0 && ordering.payment !== "none"
+        ? `, met welkomstbudget ${formatAmount(welcome, ordering.payment)}`
+        : ""
+    }.`,
+  });
 
   refresh(companyId);
   return { ok: true };
@@ -147,6 +183,17 @@ export async function updateCompanyUser(
     .eq("id", userId);
   if (error) return { ok: false, error: error.message };
 
+  await logAudit({
+    companyId: target.company_id,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    action: "bewerkt",
+    summary: `Gegevens van ${fullName ?? email} bijgewerkt${
+      status === "disabled" ? " (gedeactiveerd)" : ""
+    }.`,
+  });
+
   refresh(target.company_id);
   return { ok: true };
 }
@@ -157,8 +204,8 @@ export async function setCompanyUserPassword(
 ): Promise<Result> {
   const target = await loadTarget(userId);
   if (!target) return { ok: false, error: "Gebruiker niet gevonden." };
-  if (!(await gate(target.company_id, "users.update")))
-    return { ok: false, error: "Geen toegang" };
+  const actor = await gate(target.company_id, "users.update");
+  if (!actor) return { ok: false, error: "Geen toegang" };
 
   const password = String(fd.get("password") ?? "");
   if (password.length < MIN_PASSWORD)
@@ -172,6 +219,14 @@ export async function setCompanyUserPassword(
     { password },
   );
   if (error) return { ok: false, error: error.message };
+  await logAudit({
+    companyId: target.company_id,
+    actor,
+    targetType: "user",
+    targetId: userId,
+    action: "wachtwoord",
+    summary: `Nieuw wachtwoord ingesteld voor ${target.email ?? "medewerker"}.`,
+  });
   return { ok: true };
 }
 
@@ -198,6 +253,15 @@ export async function deleteCompanyUser(userId: string): Promise<Result> {
     };
 
   const { error } = await admin.auth.admin.deleteUser(userId);
+  if (!error)
+    await logAudit({
+      companyId: target.company_id,
+      actor,
+      targetType: "user",
+      targetId: null,
+      action: "verwijderd",
+      summary: `${target.email ?? "Medewerker"} verwijderd.`,
+    });
   if (error)
     return {
       ok: false,

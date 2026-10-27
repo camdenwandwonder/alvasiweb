@@ -50,9 +50,6 @@ export function ProductEditor({
   const [price, setPrice] = useState(
     product.base_price != null ? String(product.base_price) : "",
   );
-  const [creditCost, setCreditCost] = useState(
-    product.credit_cost != null ? String(product.credit_cost) : "",
-  );
   const [maxQty, setMaxQty] = useState(
     product.max_quantity_per_order != null
       ? String(product.max_quantity_per_order)
@@ -72,7 +69,6 @@ export function ProductEditor({
       status,
       description: description || null,
       base_price: price.trim() ? Number(price) : null,
-      credit_cost: creditCost.trim() ? Number(creditCost) : null,
       max_quantity_per_order: maxQty.trim() ? Number(maxQty) : null,
       regenVariants,
       selections,
@@ -96,7 +92,7 @@ export function ProductEditor({
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, status, description, price, creditCost, maxQty, selections]);
+  }, [name, status, description, price, maxQty, selections]);
 
   // Warn if leaving with a save still pending.
   useEffect(() => {
@@ -230,8 +226,11 @@ export function ProductEditor({
               }}
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Prijs (€)">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Prijs (€)"
+              hint="Credits worden per organisatie uit deze europrijs berekend."
+            >
               <Input
                 type="number"
                 step="0.01"
@@ -242,19 +241,6 @@ export function ProductEditor({
                   touch();
                 }}
                 placeholder="0,00"
-              />
-            </Field>
-            <Field label="Credits" hint="Voor credits-modus">
-              <Input
-                type="number"
-                step="1"
-                min="0"
-                value={creditCost}
-                onChange={(e) => {
-                  setCreditCost(e.target.value);
-                  touch();
-                }}
-                placeholder="0"
               />
             </Field>
             <Field label="Max. / bestelling" hint="Leeg = standaard">

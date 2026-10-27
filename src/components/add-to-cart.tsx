@@ -8,27 +8,31 @@ import { Input } from "@/components/ui/input";
 import { Field, NativeSelect } from "@/components/primitives";
 import { useCart } from "@/components/cart";
 import { variantLabel } from "@/lib/format";
+import { formatValue, type Display } from "@/lib/ordering";
+import type { ShopVariant } from "@/lib/shop";
 
-type Variant = {
-  id: string;
-  attributes: Record<string, unknown>;
-  price_override: number | null;
-};
+type Variant = ShopVariant;
 
 export function AddToCart({
   productId,
   name,
-  basePrice,
+  euro,
+  credits,
   image,
   variants,
+  display,
   preferredSizes = [],
+  preview = false,
 }: {
   productId: string;
   name: string;
-  basePrice: number | null;
+  euro: number;
+  credits: number;
   image: string | null;
   variants: Variant[];
+  display: Display;
   preferredSizes?: string[];
+  preview?: boolean;
 }) {
   const cart = useCart();
   const [variantId, setVariantId] = useState("");
@@ -64,14 +68,20 @@ export function AddToCart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Variants only show their own price when it differs from the product's.
+  const pricesDiffer =
+    display !== "hidden" &&
+    variants.some((v) => v.euro !== euro || v.credits !== credits);
+
   // Label an option by its remaining (non-locked) attributes.
   function optionLabel(v: Variant): string {
     const rest = Object.entries(v.attributes).filter(
       ([k]) => !locked || k !== locked.key,
     );
-    return rest.length
+    const base = rest.length
       ? rest.map(([k, val]) => `${k}: ${val}`).join(", ")
       : variantLabel(v.attributes);
+    return pricesDiffer ? `${base} · ${formatValue(v.euro, v.credits, display)}` : base;
   }
 
   const chooserLabel =
@@ -100,13 +110,13 @@ export function AddToCart({
       return;
     }
     const variant = variants.find((v) => v.id === variantId) ?? null;
-    const unitPrice = variant?.price_override ?? basePrice ?? 0;
     cart.addItem({
       productId,
       variantId: variant?.id ?? null,
       name,
       variantLabel: variant ? variantLabel(variant.attributes) : null,
-      unitPrice,
+      unitPrice: variant?.euro ?? euro,
+      unitCredits: variant?.credits ?? credits,
       image,
       qty,
     });
@@ -152,10 +162,15 @@ export function AddToCart({
             />
           </Field>
         </div>
-        <Button onClick={add} className="flex-1">
+        <Button onClick={add} className="flex-1" disabled={preview}>
           <ShoppingCart className="h-4 w-4" /> In winkelwagen
         </Button>
       </div>
+      {preview ? (
+        <p className="text-xs text-muted-foreground">
+          Voorbeeld — bestellen uitgeschakeld
+        </p>
+      ) : null}
     </div>
   );
 }

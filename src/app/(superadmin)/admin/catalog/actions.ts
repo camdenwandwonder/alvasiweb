@@ -31,7 +31,6 @@ export async function saveProduct(
     status: string;
     description: string | null;
     base_price: number | null;
-    credit_cost: number | null;
     max_quantity_per_order: number | null;
     regenVariants?: boolean;
     selections?: Record<string, string[]>;
@@ -49,8 +48,9 @@ export async function saveProduct(
         ? payload.status
         : "active",
       description: payload.description?.trim() || null,
+      // Credit prices are owned per organisation (rate + manager overrides);
+      // a product save must never overwrite them.
       base_price: payload.base_price,
-      credit_cost: payload.credit_cost,
       max_quantity_per_order: payload.max_quantity_per_order,
     })
     .eq("id", productId);

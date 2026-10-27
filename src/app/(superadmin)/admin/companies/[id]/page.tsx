@@ -7,46 +7,35 @@ import {
   Plus,
   LayoutDashboard,
   Palette,
-  Eye,
-  Wallet,
+  UserCog,
   Images,
   MapPin,
   Plug,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PageHeader,
   EmptyState,
-  Field,
-  NativeSelect,
   StatCard,
 } from "@/components/primitives";
-import { SubmitButton } from "@/components/submit-button";
 import { CompanyBrandingForm } from "@/components/company-branding-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BrandPreview } from "@/components/brand-preview";
 import { ProductThumb } from "@/components/product-thumb";
-import { BudgetSettingsPanel } from "@/components/budget-settings-panel";
 import { CompanyAddressesPanel } from "@/components/company-addresses-panel";
 import type { CompanyAddress } from "@/lib/address-actions";
-import type { BudgetMode } from "@/lib/allowance";
 import { getIntegration } from "@/lib/jamespro/sync";
 import { CompanyMedia } from "./company-media";
 import { CompanyJamespro } from "./company-jamespro";
-import type { SizeSet } from "@/components/user-sizes-dialog";
-import { UsersManager } from "@/components/users-manager";
+import { loadPersoneel } from "@/lib/personeel/data";
+import { PersoneelWorkspace } from "@/components/personeel/workspace";
 import { getCurrentUser } from "@/lib/auth/user";
 import { formatPrice } from "@/lib/format";
-import {
-  updateCompany,
-  deleteCompany,
-  setCompanyCategoryVisibility,
-} from "./actions";
+import { updateCompany, deleteCompany } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +47,13 @@ const STATUS: Record<string, string> = {
 
 export default async function CompanyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string; persoon?: string; functie?: string; sub?: string }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
   const me = await getCurrentUser();
   const admin = createAdminClient();
 
@@ -76,90 +68,32 @@ export default async function CompanyDetailPage({
 
   const jamesproConnected = !!(await getIntegration())?.enabled;
 
-  const [
-    { data: products },
-    { data: roles },
-    { data: users },
-    { data: crv },
-    { data: budgets },
-    { data: allotments },
-    { data: media },
-    { data: addresses },
-    { data: sizeSets },
-  ] = await Promise.all([
-    admin
-      .from("products")
-      .select(
-        "id, name, status, base_price, category:categories(id, name), images:product_images(url, is_primary)",
-      )
-      .eq("company_id", id)
-      .order("created_at", { ascending: false }),
-    admin
-      .from("roles")
-      .select("id, name, requires_order_approval")
-      .eq("company_id", id)
-      .order("name"),
-    admin
-      .from("profiles")
-      .select("id, full_name, email, status, sizes, role_id")
-      .eq("company_id", id)
-      .order("created_at", { ascending: false }),
-    admin
-      .from("category_role_visibility")
-      .select("category_id, role_id")
-      .eq("company_id", id),
-    admin
-      .from("budgets")
-      .select("id, scope, target_id, amount, period, kind")
-      .eq("company_id", id)
-      .order("created_at", { ascending: false }),
-    admin
-      .from("product_allotments")
-      .select("id, scope, target_id, product_id, max_quantity, period")
-      .eq("company_id", id)
-      .order("created_at", { ascending: false }),
-    admin
-      .from("company_media")
-      .select("id, url")
-      .eq("company_id", id)
-      .order("sort_order"),
-    admin
-      .from("company_addresses")
-      .select("*")
-      .eq("company_id", id)
-      .order("is_default", { ascending: false })
-      .order("sort_order"),
-    admin
-      .from("option_sets")
-      .select("id, name, values:option_values(id, value, label, sort_order)")
-      .eq("kind", "size")
-      .order("name"),
-  ]);
+  const [{ data: products }, { data: media }, { data: addresses }, personeel] =
+    await Promise.all([
+      admin
+        .from("products")
+        .select(
+          "id, name, status, base_price, category:categories(id, name), images:product_images(url, is_primary)",
+        )
+        .eq("company_id", id)
+        .order("created_at", { ascending: false }),
+      admin
+        .from("company_media")
+        .select("id, url")
+        .eq("company_id", id)
+        .order("sort_order"),
+      admin
+        .from("company_addresses")
+        .select("*")
+        .eq("company_id", id)
+        .order("is_default", { ascending: false })
+        .order("sort_order"),
+      loadPersoneel(id),
+    ]);
 
   const productList = products ?? [];
-  const userList = users ?? [];
-  const roleList = roles ?? [];
-
-  // Distinct categories used by this company's catalog (for visibility tab).
-  const catMap = new Map<string, string>();
-  for (const p of productList) {
-    const c = p.category as unknown as { id: string; name: string } | null;
-    if (c) catMap.set(c.id, c.name);
-  }
-  const usedCategories = [...catMap.entries()].map(([cid, name]) => ({
-    id: cid,
-    name,
-  }));
-  const allowedByCat = new Map<string, Set<string>>();
-  for (const r of crv ?? []) {
-    const s = allowedByCat.get(r.category_id) ?? new Set<string>();
-    s.add(r.role_id);
-    allowedByCat.set(r.category_id, s);
-  }
-
-  const settings = (company.settings as Record<string, unknown>) ?? {};
-  const budgetMode = (settings.budget_mode as BudgetMode) ?? "euro";
-  const threshold = settings.approval_over_amount;
+  const tabs = ["overview", "branding", "products", "personeel", "addresses", "jamespro", "media"];
+  const initialTab = tabs.includes(query.tab ?? "") ? query.tab! : "overview";
 
   return (
     <div>
@@ -172,7 +106,7 @@ export default async function CompanyDetailPage({
 
       <PageHeader title={company.name} description={`/${company.slug}`} />
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue={initialTab} className="w-full">
         <TabsList>
           <TabsTrigger value="overview">
             <LayoutDashboard className="h-4 w-4" /> Overzicht
@@ -183,14 +117,8 @@ export default async function CompanyDetailPage({
           <TabsTrigger value="products">
             <Package className="h-4 w-4" /> Producten
           </TabsTrigger>
-          <TabsTrigger value="users">
-            <Users className="h-4 w-4" /> Gebruikers
-          </TabsTrigger>
-          <TabsTrigger value="visibility">
-            <Eye className="h-4 w-4" /> Zichtbaarheid
-          </TabsTrigger>
-          <TabsTrigger value="budget">
-            <Wallet className="h-4 w-4" /> Bestelwijze
+          <TabsTrigger value="personeel">
+            <UserCog className="h-4 w-4" /> Personeel
           </TabsTrigger>
           <TabsTrigger value="addresses">
             <MapPin className="h-4 w-4" /> Leveradressen
@@ -207,7 +135,7 @@ export default async function CompanyDetailPage({
         <TabsContent value="overview" className="mt-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <StatCard label="Producten" value={productList.length} icon={Package} accent />
-            <StatCard label="Gebruikers" value={userList.length} icon={Users} />
+            <StatCard label="Medewerkers" value={personeel.people.length} icon={Users} />
             <div className="sm:col-span-1">
               <BrandPreview
                 name={company.name}
@@ -316,107 +244,23 @@ export default async function CompanyDetailPage({
           )}
         </TabsContent>
 
-        {/* Gebruikers */}
-        <TabsContent value="users" className="mt-4">
-          <UsersManager
-            companyId={company.id}
-            users={userList.map((u) => ({
-              id: u.id,
-              full_name: u.full_name,
-              email: u.email,
-              status: u.status,
-              role_id: u.role_id,
-              sizes: (u.sizes as Record<string, string> | null) ?? null,
-            }))}
-            roles={roleList.map((r) => ({ id: r.id, name: r.name }))}
-            sizeSets={(sizeSets ?? []) as unknown as SizeSet[]}
+        {/* Personeel */}
+        <TabsContent value="personeel" className="mt-4">
+          <PersoneelWorkspace
+            data={personeel}
+            perms={{
+              view: true,
+              invite: true,
+              update: true,
+              remove: true,
+              roles: true,
+              settings: true,
+            }}
             currentUserId={me?.id ?? ""}
-            canInvite
-            canUpdate
-            canRemove
-          />
-        </TabsContent>
-
-        {/* Zichtbaarheid */}
-        <TabsContent value="visibility" className="mt-4">
-          <p className="mb-4 text-sm text-muted-foreground">
-            Bepaal welke rollen de producten van een categorie zien. Geen
-            selectie = zichtbaar voor iedereen.
-          </p>
-          {usedCategories.length === 0 ? (
-            <EmptyState
-              icon={Eye}
-              title="Nog geen categorieën in de catalogus"
-              description="Voeg producten met een categorie toe om zichtbaarheid in te stellen."
-            />
-          ) : roleList.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Dit bedrijf heeft nog geen rollen.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {usedCategories.map((c) => {
-                const set = allowedByCat.get(c.id) ?? new Set<string>();
-                const restricted = set.size > 0;
-                return (
-                  <Card key={c.id}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between text-base">
-                        {c.name}
-                        <span className="text-xs font-normal text-muted-foreground">
-                          {restricted
-                            ? `Zichtbaar voor ${set.size} rol(len)`
-                            : "Zichtbaar voor iedereen"}
-                        </span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <form
-                        action={setCompanyCategoryVisibility.bind(null, id, c.id)}
-                        className="space-y-3"
-                      >
-                        <div className="flex flex-wrap gap-2">
-                          {roleList.map((r) => (
-                            <label
-                              key={r.id}
-                              className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand)]/5"
-                            >
-                              <input
-                                type="checkbox"
-                                name="role_ids"
-                                value={r.id}
-                                defaultChecked={set.has(r.id)}
-                                className="h-3.5 w-3.5"
-                              />
-                              {r.name}
-                            </label>
-                          ))}
-                        </div>
-                        <SubmitButton size="sm">Opslaan</SubmitButton>
-                      </form>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Bestelwijze */}
-        <TabsContent value="budget" className="mt-4">
-          <BudgetSettingsPanel
-            companyId={id}
-            mode={budgetMode}
-            approvalThreshold={threshold != null ? String(threshold) : ""}
-            roles={roleList.map((r) => ({ id: r.id, name: r.name }))}
-            people={userList.map((u) => ({
-              id: u.id,
-              full_name: u.full_name,
-              email: u.email,
-            }))}
-            products={productList.map((p) => ({ id: p.id, name: p.name }))}
-            budgets={(budgets ?? []) as never}
-            allotments={(allotments ?? []) as never}
+            previewBase={`/admin/companies/${id}/bekijk/`}
+            initial={{ tab: query.sub, persoon: query.persoon, functie: query.functie }}
+            tabParam="sub"
+            header={false}
           />
         </TabsContent>
 

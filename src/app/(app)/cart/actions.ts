@@ -1,10 +1,12 @@
 "use server";
 
 import { after } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth/user";
+import { createAdminClient } from "@/lib/supabase/server";
+import { getCurrentUser, can } from "@/lib/auth/user";
 import { getAllowance } from "@/lib/allowance";
 import { variantLabel, formatPrice } from "@/lib/format";
+import { effectiveCredits, formatCredits, PERIOD_LABEL, type Period } from "@/lib/ordering";
+import { seesFullCatalogue } from "@/lib/permissions";
 import { sendEmail } from "@/lib/email";
 import { processOrderSync } from "@/lib/jamespro/sync";
 
@@ -32,42 +34,61 @@ export type Delivery = {
   note?: string;
 };
 
-/**
- * Creates one order from the cart. Prices/credits are recomputed server-side
- * (never trusted from the client). If the order exceeds the member's remaining
- * allowance (euro/credits/quantity), it is flagged as a request (is_request +
- * reason) and the DB trigger routes it to approval.
- */
 export type CheckoutResult =
   | { ok: true; orderId: string; isRequest: boolean }
   | { ok: false; error: string; code?: "reason_required" };
 
+type ProductRow = {
+  id: string;
+  name: string;
+  sku: string | null;
+  status: string;
+  base_price: number | null;
+  credit_cost: number | null;
+  credit_cost_manual: boolean;
+  category_id: string | null;
+  max_quantity_per_order: number | null;
+  variants: {
+    id: string;
+    attributes: Record<string, unknown>;
+    sku: string | null;
+    price_override: number | null;
+    credit_cost: number | null;
+  }[];
+};
+
+/**
+ * Creates one order from the cart. Euro prices and credits are recomputed
+ * server-side (never trusted from the browser) and the order is written with
+ * the admin client after checking access, visibility, budget and maxima.
+ * Going over budget needs a written reason; going over a maximum or using a
+ * custom address turns the order into a request that needs approval.
+ */
 export async function createOrderFromCart(
   items: CheckoutItem[],
   delivery: Delivery,
   options?: { reason?: string },
 ): Promise<CheckoutResult> {
   const user = await getCurrentUser();
-  if (!user || !user.companyId) return { ok: false, error: "Geen toegang" };
-  if (!items.length)
-    return { ok: false, error: "Je winkelwagen is leeg" };
+  if (!user?.companyId || !can(user, "orders.create"))
+    return { ok: false, error: "Geen toegang" };
+  if (!items.length) return { ok: false, error: "Je winkelwagen is leeg" };
 
-  const supabase = await createClient();
+  const companyId = user.companyId;
+  const admin = createAdminClient();
 
-  // Resolve the delivery address. A selected saved company address is trusted
-  // (loaded server-side); a manual address is only treated as a deviation that
-  // needs approval when the company actually has saved addresses to deviate from.
+  // Delivery address: a saved company address is trusted; a manual address is
+  // a deviation (needs approval) only when saved addresses exist.
   const note = delivery.note?.trim() || null;
   let shipTo: ShipTo = {};
   let addressIsCustom = false;
-
   if (delivery.addressId) {
-    const { data: addr } = await supabase
+    const { data: addr } = await admin
       .from("company_addresses")
       .select("label, recipient, street, postal_code, city, country")
       .eq("id", delivery.addressId)
-      .eq("company_id", user.companyId)
-      .single();
+      .eq("company_id", companyId)
+      .maybeSingle();
     if (!addr) return { ok: false, error: "Gekozen leveradres niet gevonden" };
     shipTo = {
       name: addr.recipient ?? addr.label,
@@ -78,13 +99,47 @@ export async function createOrderFromCart(
     };
   } else {
     shipTo = delivery.custom ?? {};
-    const { count } = await supabase
+    const { count } = await admin
       .from("company_addresses")
-      .select("*", { count: "exact", head: true })
-      .eq("company_id", user.companyId);
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId);
     addressIsCustom = (count ?? 0) > 0;
   }
 
+  const productIds = [...new Set(items.map((i) => i.productId))];
+  const [{ data: productData }, { data: rules }, { settings, allowance }] = await Promise.all([
+    admin
+      .from("products")
+      .select(
+        "id, name, sku, status, base_price, credit_cost, credit_cost_manual, category_id, max_quantity_per_order, variants:product_variants(id, attributes, sku, price_override, credit_cost)",
+      )
+      .eq("company_id", companyId)
+      .in("id", productIds),
+    admin
+      .from("category_role_visibility")
+      .select("category_id, role_id")
+      .eq("company_id", companyId),
+    getAllowance(user),
+  ]);
+  const products = new Map(
+    ((productData ?? []) as unknown as ProductRow[]).map((p) => [p.id, p]),
+  );
+
+  // Same catalogue rule as the shop.
+  const restricted = new Map<string, Set<string>>();
+  for (const r of rules ?? []) {
+    const s = restricted.get(r.category_id) ?? new Set<string>();
+    s.add(r.role_id);
+    restricted.set(r.category_id, s);
+  }
+  const fullCatalogue = seesFullCatalogue(user.permissions);
+  const visible = (p: ProductRow) => {
+    if (fullCatalogue || !p.category_id) return true;
+    const set = restricted.get(p.category_id);
+    return !set || (!!user.roleId && set.has(user.roleId));
+  };
+
+  const rate = settings.creditRate;
   const lines: {
     product_id: string;
     variant_id: string | null;
@@ -98,106 +153,101 @@ export async function createOrderFromCart(
   }[] = [];
   let subtotal = 0;
   let creditTotal = 0;
-  const qtyByProduct: Record<string, number> = {};
+  const qtyByProduct = new Map<string, number>();
 
   for (const item of items) {
+    const p = products.get(item.productId);
+    if (!p || p.status !== "active" || !visible(p))
+      return { ok: false, error: "Een product in je winkelwagen is niet (meer) beschikbaar." };
+
     const qty = Math.max(1, Math.floor(item.qty));
-    const { data: product, error } = await supabase
-      .from("products")
-      .select("id, name, sku, base_price, credit_cost, max_quantity_per_order")
-      .eq("id", item.productId)
-      .single();
-    if (error || !product)
-      return { ok: false, error: "Product niet gevonden" };
-    if (product.max_quantity_per_order && qty > product.max_quantity_per_order) {
+    if (p.max_quantity_per_order && qty > p.max_quantity_per_order)
       return {
         ok: false,
-        error: `Maximaal ${product.max_quantity_per_order} per bestelling voor ${product.name}`,
+        error: `Maximaal ${p.max_quantity_per_order} per bestelling voor ${p.name}`,
       };
-    }
 
-    let unitPrice = Number(product.base_price ?? 0);
-    const creditCost = Number(product.credit_cost ?? 0);
-    let label: string | null = item.variantLabel?.trim() || null;
-    let sku: string | null = product.sku;
-    // Only keep variant_id if the variant still exists (carts in localStorage
-    // can hold stale ids after the catalog/options are re-generated).
-    let resolvedVariantId: string | null = null;
-    if (item.variantId) {
-      const { data: variant } = await supabase
-        .from("product_variants")
-        .select("id, attributes, sku, price_override")
-        .eq("id", item.variantId)
-        .maybeSingle();
-      if (variant) {
-        resolvedVariantId = variant.id;
-        label = variantLabel(variant.attributes as Record<string, unknown>);
-        sku = variant.sku ?? sku;
-        if (variant.price_override != null) unitPrice = Number(variant.price_override);
-      }
-    }
+    // Stale variant ids (catalogue regenerated) fall back to the product.
+    const variant = item.variantId
+      ? (p.variants.find((v) => v.id === item.variantId) ?? null)
+      : null;
+    const unitPrice =
+      variant?.price_override != null ? Number(variant.price_override) : Number(p.base_price ?? 0);
+    const unitCredits = effectiveCredits(p, variant, rate);
 
-    const lineTotal = unitPrice * qty;
-    subtotal += lineTotal;
-    creditTotal += creditCost * qty;
-    qtyByProduct[product.id] = (qtyByProduct[product.id] ?? 0) + qty;
+    subtotal += unitPrice * qty;
+    creditTotal += unitCredits * qty;
+    qtyByProduct.set(p.id, (qtyByProduct.get(p.id) ?? 0) + qty);
     lines.push({
-      product_id: product.id,
-      variant_id: resolvedVariantId,
-      product_name: product.name,
-      variant_label: label,
-      sku,
+      product_id: p.id,
+      variant_id: variant?.id ?? null,
+      product_name: p.name,
+      variant_label: variant
+        ? variantLabel(variant.attributes)
+        : item.variantLabel?.trim() || null,
+      sku: variant?.sku ?? p.sku,
       quantity: qty,
       unit_price: unitPrice,
-      line_total: lineTotal,
-      credit_cost: creditCost,
+      line_total: unitPrice * qty,
+      credit_cost: unitCredits,
     });
   }
 
-  // Over-allowance detection in the company's mode.
-  const allowance = await getAllowance(user);
-  let isOver = false;
-  if (allowance.hasLimit) {
-    if (allowance.mode === "euro" && allowance.remaining != null)
-      isOver = subtotal > allowance.remaining;
-    else if (allowance.mode === "credits" && allowance.remaining != null)
-      isOver = creditTotal > allowance.remaining;
-    else if (allowance.mode === "quantity") {
-      for (const [pid, q] of Object.entries(qtyByProduct)) {
-        const rem = allowance.perProduct?.[pid]?.remaining;
-        if (rem != null && q > rem) isOver = true;
+  // Maxima per product.
+  const capReasons: string[] = [];
+  if (allowance.capsEnabled) {
+    for (const [pid, qty] of qtyByProduct) {
+      const cap = allowance.caps[pid];
+      const name = products.get(pid)?.name ?? "product";
+      if (!cap) {
+        if (allowance.uncapped === "blocked")
+          return {
+            ok: false,
+            error: `${name} kun je niet bestellen: er is voor jou geen maximum ingesteld.`,
+          };
+        continue;
+      }
+      if (qty > cap.remaining) {
+        const period = PERIOD_LABEL[cap.period as Period] ?? "";
+        capReasons.push(
+          `Maximum overschreden: ${name} (${cap.used + qty} van ${cap.max} ${period})`.trim(),
+        );
       }
     }
   }
 
+  // Budget in the payment unit (approved extra budget is included).
+  let overBudget = false;
+  if (allowance.budget) {
+    const spend = settings.payment === "credits" ? creditTotal : subtotal;
+    overBudget = spend > allowance.budget.remaining + 1e-9;
+  }
+
   const userReason = options?.reason?.trim() || null;
-  // Over-allowance still requires a written reason from the member.
-  if (isOver && !userReason)
+  if (overBudget && !userReason)
     return {
       ok: false,
       code: "reason_required",
       error: "Geef een reden op voor je aanvraag.",
     };
 
-  // A custom delivery address always routes to approval (auto reason).
   const reasonParts: string[] = [];
-  if (isOver && userReason) reasonParts.push(userReason);
+  if (overBudget && userReason) reasonParts.push(userReason);
+  reasonParts.push(...capReasons);
   if (addressIsCustom) {
     const addrText = [shipTo.name, shipTo.address, shipTo.postal, shipTo.city]
       .map((s) => s?.trim())
       .filter(Boolean)
       .join(", ");
-    reasonParts.push(
-      `Afwijkend leveradres${addrText ? `: ${addrText}` : ""}`,
-    );
+    reasonParts.push(`Afwijkend leveradres${addrText ? `: ${addrText}` : ""}`);
   }
-  const isRequest = isOver || addressIsCustom;
+  const isRequest = overBudget || capReasons.length > 0 || addressIsCustom;
   const finalReason = reasonParts.join(" · ") || null;
 
-  const { data: order, error: oErr } = await supabase
+  const { data: order, error: oErr } = await admin
     .from("orders")
     .insert({
-      company_id: user.companyId,
+      company_id: companyId,
       ordered_by: user.id,
       note,
       ship_to_name: shipTo.name?.trim() || null,
@@ -209,6 +259,7 @@ export async function createOrderFromCart(
       subtotal,
       total: subtotal,
       credit_total: creditTotal,
+      credit_rate: settings.payment === "credits" ? rate : null,
       is_request: isRequest,
       request_reason: finalReason,
     })
@@ -217,11 +268,14 @@ export async function createOrderFromCart(
   if (oErr || !order)
     return { ok: false, error: `Bestelling mislukt: ${oErr?.message ?? "onbekend"}` };
 
-  const { error: iErr } = await supabase.from("order_items").insert(
-    lines.map((l) => ({ order_id: order.id, company_id: user.companyId, ...l })),
-  );
-  if (iErr)
+  const { error: iErr } = await admin
+    .from("order_items")
+    .insert(lines.map((l) => ({ order_id: order.id, company_id: companyId, ...l })));
+  if (iErr) {
+    // Never leave an order without lines behind.
+    await admin.from("orders").delete().eq("id", order.id);
     return { ok: false, error: `Bestelregels mislukt: ${iErr.message}` };
+  }
 
   const notifyTo = process.env.ALVASI_NOTIFY_EMAIL;
   if (notifyTo) {
@@ -240,13 +294,15 @@ export async function createOrderFromCart(
         <p>Bedrijf: ${user.company?.name ?? ""}<br/>Besteld door: ${user.fullName ?? user.email ?? ""}</p>
         ${finalReason ? `<p>Reden: ${finalReason}</p>` : ""}
         <ul>${rows}</ul>
-        <p><strong>Totaal: ${formatPrice(subtotal)}</strong></p>`,
+        <p><strong>Totaal: ${formatPrice(subtotal)}</strong>${
+          settings.payment === "credits" ? ` (${formatCredits(creditTotal)})` : ""
+        }</p>`,
     });
   }
 
   // Orders that skip approval go straight to production and are synced to
-  // JamesPRO right after the response ("approved" covers pre-migration rows).
-  if (order.status === "in_production" || order.status === "approved") {
+  // JamesPRO right after the response.
+  if (order.status === "in_production") {
     after(async () => {
       await processOrderSync(order.id);
     });

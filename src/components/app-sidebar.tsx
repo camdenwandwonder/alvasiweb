@@ -29,6 +29,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
@@ -57,7 +58,26 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   settings: Settings,
 };
 
-export type SidebarNavItem = { href: string; label: string; icon: string };
+export type SidebarNavItem = {
+  href: string;
+  label: string;
+  icon: string;
+  /** Section heading the item is listed under. */
+  group?: string;
+  /** Count shown next to the item (e.g. waiting approvals). */
+  badge?: number;
+};
+
+/** Keeps the order of first appearance for groups and items. */
+function groupItems(items: SidebarNavItem[]) {
+  const out: { group?: string; items: SidebarNavItem[] }[] = [];
+  for (const item of items) {
+    const last = out.find((g) => g.group === item.group);
+    if (last) last.items.push(item);
+    else out.push({ group: item.group, items: [item] });
+  }
+  return out;
+}
 
 export function AppSidebar({
   brandName,
@@ -121,38 +141,45 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => {
-                const Icon = ICONS[item.icon] ?? LayoutDashboard;
-                const active =
-                  pathname === item.href ||
-                  (item.href !== "/" && pathname.startsWith(`${item.href}/`));
-                const showCart =
-                  item.icon === "cart" && !!cartCount && cartCount > 0;
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      render={<Link href={item.href} />}
-                      isActive={active}
-                      tooltip={item.label}
-                      className="data-[active=true]:bg-[var(--brand)] data-[active=true]:text-[var(--brand-foreground)]"
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                    {showCart ? (
-                      <SidebarMenuBadge className="bg-[var(--brand)] text-[var(--brand-foreground)] peer-data-active/menu-button:bg-[var(--brand-foreground)] peer-data-active/menu-button:text-[var(--brand)]">
-                        {cartCount > 99 ? "99+" : cartCount}
-                      </SidebarMenuBadge>
-                    ) : null}
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {groupItems(items).map(({ group, items: groupList }) => (
+          <SidebarGroup key={group ?? "_"} className="py-1">
+            {group ? (
+              <SidebarGroupLabel className="text-[11px] font-semibold tracking-wide uppercase">
+                {group}
+              </SidebarGroupLabel>
+            ) : null}
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                {groupList.map((item) => {
+                  const Icon = ICONS[item.icon] ?? LayoutDashboard;
+                  const active =
+                    pathname === item.href ||
+                    (item.href !== "/" && pathname.startsWith(`${item.href}/`));
+                  const count =
+                    item.icon === "cart" ? (cartCount ?? 0) : (item.badge ?? 0);
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        render={<Link href={item.href} />}
+                        isActive={active}
+                        tooltip={item.label}
+                        className="h-10 gap-3 px-3 text-[15px] data-[active=true]:bg-[var(--brand)] data-[active=true]:text-[var(--brand-foreground)] [&_svg]:size-5 group-data-[collapsible=icon]:[&_svg]:size-4"
+                      >
+                        <Icon />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                      {count > 0 ? (
+                        <SidebarMenuBadge className="top-2.5 right-2 min-w-6 rounded-full bg-[var(--brand)] px-1.5 text-[var(--brand-foreground)] peer-data-active/menu-button:bg-[var(--brand-foreground)] peer-data-active/menu-button:text-[var(--brand)]">
+                          {count > 99 ? "99+" : count}
+                        </SidebarMenuBadge>
+                      ) : null}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>

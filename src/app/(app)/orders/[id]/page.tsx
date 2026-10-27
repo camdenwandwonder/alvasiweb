@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, can } from "@/lib/auth/user";
+import { getCurrentUser, can, isMember } from "@/lib/auth/user";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
-import { formatDate, formatPrice, ORDER_STATUS } from "@/lib/format";
+import { formatDate, ORDER_STATUS } from "@/lib/format";
+import { displayFor, formatValue, readOrderingSettings } from "@/lib/ordering";
 import { approveOrder, rejectOrder, decideProof } from "../actions";
+import { CancelOrderButton } from "./cancel-order-button";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,7 @@ type Item = {
   quantity: number;
   unit_price: number;
   line_total: number;
+  credit_cost: number | null;
 };
 
 const PROOF_STATUS: Record<
@@ -40,13 +43,13 @@ export default async function OrderDetailPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, created_at, note, subtotal, total, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, items:order_items(product_name, variant_label, quantity, unit_price, line_total)",
+      "id, order_number, status, created_at, note, subtotal, total, credit_total, ordered_by, company_id, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, items:order_items(product_name, variant_label, quantity, unit_price, line_total, credit_cost)",
     )
     .eq("id", id)
     .maybeSingle();
   if (!order) notFound();
 
-  const [{ data: proofs }, { data: events }] = await Promise.all([
+  const [{ data: proofs }, { data: events }, { data: company }] = await Promise.all([
     supabase
       .from("proofs")
       .select("id, version, file_url, status, created_at")
@@ -57,7 +60,16 @@ export default async function OrderDetailPage({
       .select("id, status, note, created_at")
       .eq("order_id", id)
       .order("created_at", { ascending: false }),
+    supabase.from("companies").select("settings").eq("id", order.company_id).maybeSingle(),
   ]);
+  const display = displayFor(
+    readOrderingSettings(company?.settings as Record<string, unknown> | null),
+    isMember(user) ? "member" : "manager",
+  );
+  const canCancel =
+    order.ordered_by === user?.id &&
+    can(user, "orders.cancel") &&
+    order.status === "pending_approval";
 
   const items = (order.items ?? []) as unknown as Item[];
   const status = ORDER_STATUS[order.status] ?? {
@@ -86,6 +98,7 @@ export default async function OrderDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+          {canCancel ? <CancelOrderButton orderId={order.id} /> : null}
           {canApprove && order.status === "pending_approval" ? (
             <>
               <form action={approveOrder.bind(null, order.id)}>
@@ -117,21 +130,34 @@ export default async function OrderDetailPage({
                     </p>
                   ) : null}
                 </div>
-                <div className="text-right text-sm">
-                  <p>
-                    {i.quantity} × {formatPrice(i.unit_price)}
-                  </p>
-                  <p className="font-medium">{formatPrice(i.line_total)}</p>
-                </div>
+                {display === "hidden" ? (
+                  <span className="text-sm">{i.quantity} ×</span>
+                ) : (
+                  <div className="text-right text-sm">
+                    <p>
+                      {i.quantity} ×{" "}
+                      {formatValue(i.unit_price, Number(i.credit_cost ?? 0), display)}
+                    </p>
+                    <p className="font-medium">
+                      {formatValue(
+                        i.line_total,
+                        Number(i.credit_cost ?? 0) * i.quantity,
+                        display,
+                      )}
+                    </p>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
-          <div className="mt-3 flex items-center justify-between border-t pt-3">
-            <span className="font-medium">Totaal</span>
-            <span className="text-lg font-semibold">
-              {formatPrice(order.total)}
-            </span>
-          </div>
+          {display !== "hidden" ? (
+            <div className="mt-3 flex items-center justify-between border-t pt-3">
+              <span className="font-medium">Totaal</span>
+              <span className="text-lg font-semibold">
+                {formatValue(Number(order.total), Number(order.credit_total ?? 0), display)}
+              </span>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

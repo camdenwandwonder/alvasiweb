@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, can } from "@/lib/auth/user";
+import { getCurrentUser, can, isMember } from "@/lib/auth/user";
 import { PageHeader, EmptyState, StatusBadge } from "@/components/primitives";
-import { formatDate, formatPrice, ORDER_STATUS } from "@/lib/format";
+import { formatDate, ORDER_STATUS } from "@/lib/format";
+import { displayFor, formatValue, readOrderingSettings } from "@/lib/ordering";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ type OrderRow = {
   order_number: string | null;
   status: string;
   total: number;
+  credit_total: number | null;
   created_at: string;
   ordered_by: string;
   items: { quantity: number; product_name: string }[];
@@ -21,12 +23,19 @@ export default async function OrdersPage() {
   const user = await getCurrentUser();
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("orders")
-    .select(
-      "id, order_number, status, total, created_at, ordered_by, items:order_items(quantity, product_name)",
-    )
-    .order("created_at", { ascending: false });
+  const [{ data }, { data: company }] = await Promise.all([
+    supabase
+      .from("orders")
+      .select(
+        "id, order_number, status, total, credit_total, created_at, ordered_by, items:order_items(quantity, product_name)",
+      )
+      .order("created_at", { ascending: false }),
+    supabase.from("companies").select("settings").eq("id", user?.companyId ?? "").maybeSingle(),
+  ]);
+  const display = displayFor(
+    readOrderingSettings(company?.settings as Record<string, unknown> | null),
+    isMember(user) ? "member" : "manager",
+  );
 
   const orders = (data ?? []) as unknown as OrderRow[];
   const viewAll = can(user, "orders.view_all");
@@ -88,9 +97,11 @@ export default async function OrdersPage() {
                       {formatDate(o.created_at)}
                     </p>
                   </div>
-                  <span className="shrink-0 font-medium">
-                    {formatPrice(o.total)}
-                  </span>
+                  {display !== "hidden" ? (
+                    <span className="shrink-0 font-medium">
+                      {formatValue(Number(o.total), Number(o.credit_total ?? 0), display)}
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             );

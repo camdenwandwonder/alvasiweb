@@ -14,6 +14,8 @@ export type CartItem = {
   name: string;
   variantLabel: string | null;
   unitPrice: number;
+  /** Credit price per unit (absent in carts saved before credits existed). */
+  unitCredits?: number;
   image: string | null;
   qty: number;
 };
@@ -22,6 +24,7 @@ type CartCtx = {
   items: CartItem[];
   count: number;
   subtotal: number;
+  creditsSubtotal: number;
   addItem: (item: CartItem) => void;
   setQty: (productId: string, variantId: string | null, qty: number) => void;
   removeItem: (productId: string, variantId: string | null) => void;
@@ -63,6 +66,7 @@ export function CartProvider({
       items,
       count: items.reduce((s, i) => s + i.qty, 0),
       subtotal: items.reduce((s, i) => s + i.qty * i.unitPrice, 0),
+      creditsSubtotal: items.reduce((s, i) => s + i.qty * (i.unitCredits ?? 0), 0),
       addItem: (item) =>
         setItems((prev) => {
           const idx = prev.findIndex((p) =>
@@ -70,7 +74,12 @@ export function CartProvider({
           );
           if (idx >= 0) {
             const next = [...prev];
-            next[idx] = { ...next[idx], qty: next[idx].qty + item.qty };
+            next[idx] = {
+              ...next[idx],
+              unitPrice: item.unitPrice,
+              unitCredits: item.unitCredits,
+              qty: next[idx].qty + item.qty,
+            };
             return next;
           }
           return [...prev, item];

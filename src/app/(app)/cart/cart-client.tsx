@@ -19,8 +19,13 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, NativeSelect } from "@/components/primitives";
-import { useCart } from "@/components/cart";
-import { formatPrice } from "@/lib/format";
+import { useCart, type CartItem } from "@/components/cart";
+import {
+  formatAmount,
+  formatValue,
+  type Display,
+  type PaymentMode,
+} from "@/lib/ordering";
 import { createOrderFromCart } from "./actions";
 
 export type DeliveryAddress = {
@@ -49,8 +54,38 @@ function addressLine(a: DeliveryAddress): string {
   );
 }
 
-export function CartClient({ addresses }: { addresses: DeliveryAddress[] }) {
+export function CartClient({
+  addresses,
+  display,
+  payment,
+  budgetRemaining,
+}: {
+  addresses: DeliveryAddress[];
+  display: Display;
+  payment: PaymentMode;
+  budgetRemaining: number | null;
+}) {
   const cart = useCart();
+  // Carts saved before credits existed lack a credit price per line; the
+  // server recalculates on checkout, so only the preview is affected.
+  const creditsKnown = cart.items.every((i) => i.unitCredits != null);
+  const showCredits = display === "credits" || display === "both";
+  function lineValue(i: CartItem): string {
+    if (showCredits && i.unitCredits == null)
+      return display === "both" ? formatValue(i.unitPrice * i.qty, 0, "euro") : "";
+    return formatValue(i.unitPrice * i.qty, (i.unitCredits ?? 0) * i.qty, display);
+  }
+  const totalLabel =
+    showCredits && !creditsKnown
+      ? display === "both"
+        ? formatValue(cart.subtotal, 0, "euro")
+        : "Wordt berekend bij plaatsen"
+      : formatValue(cart.subtotal, cart.creditsSubtotal, display);
+  const spend = payment === "credits" ? cart.creditsSubtotal : cart.subtotal;
+  const overBudget =
+    budgetRemaining != null &&
+    (payment !== "credits" || creditsKnown) &&
+    spend > budgetRemaining + 1e-9;
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [requireReason, setRequireReason] = useState(false);
@@ -206,9 +241,7 @@ export function CartClient({ addresses }: { addresses: DeliveryAddress[] }) {
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                  <span className="text-sm font-medium">
-                    {formatPrice(i.unitPrice * i.qty)}
-                  </span>
+                  <span className="text-sm font-medium">{lineValue(i)}</span>
                 </div>
               </div>
             </li>
@@ -221,12 +254,25 @@ export function CartClient({ addresses }: { addresses: DeliveryAddress[] }) {
             <CardTitle className="text-base">Afrekenen</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex items-center justify-between border-b pb-4">
-              <span className="text-sm text-muted-foreground">Totaal</span>
-              <span className="text-lg font-semibold">
-                {formatPrice(cart.subtotal)}
-              </span>
-            </div>
+            {display !== "hidden" ? (
+              <div className="mb-4 border-b pb-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Totaal</span>
+                  <span className="text-lg font-semibold">{totalLabel}</span>
+                </div>
+                {budgetRemaining != null ? (
+                  <p
+                    className={`mt-1 text-right text-xs ${
+                      overBudget ? "text-amber-700" : "text-muted-foreground"
+                    }`}
+                  >
+                    {overBudget
+                      ? `Meer dan je resterende ${formatAmount(budgetRemaining, payment)} — dit wordt een aanvraag`
+                      : `Nog ${formatAmount(budgetRemaining, payment)} beschikbaar`}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <form onSubmit={checkout} className="space-y-3">
               {hasAddresses ? (
                 <Field label="Leveradres">

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, can, isMember } from "@/lib/auth/user";
+import { createAdminClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { CartProvider } from "@/components/cart";
 import type { SidebarNavItem } from "@/components/app-sidebar";
@@ -29,29 +30,50 @@ export default async function AppLayout({
     );
   }
 
+  // Waiting approvals (orders + budget requests) for the menu badge.
+  let waiting = 0;
+  if (can(user, "orders.approve")) {
+    const admin = createAdminClient();
+    const [{ count: orders }, { count: requests }] = await Promise.all([
+      admin
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", user.company.id)
+        .eq("status", "pending_approval"),
+      admin
+        .from("budget_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", user.company.id)
+        .eq("status", "pending"),
+    ]);
+    waiting = (orders ?? 0) + (requests ?? 0);
+  }
+
+  const order = "Bestellen";
+  const manage = "Beheer";
+  const items: SidebarNavItem[] = [];
   // Plain members have no Start page — the Winkel is their landing page.
-  const items: SidebarNavItem[] = isMember(user)
-    ? []
-    : [{ href: "/dashboard", label: "Start", icon: "dashboard" }];
+  if (!isMember(user))
+    items.push({ href: "/dashboard", label: "Start", icon: "dashboard", group: order });
   if (can(user, "products.view"))
-    items.push({ href: "/products", label: "Winkel", icon: "shop" });
+    items.push({ href: "/products", label: "Winkel", icon: "shop", group: order });
   if (can(user, "orders.create"))
-    items.push({ href: "/cart", label: "Winkelwagen", icon: "cart" });
+    items.push({ href: "/cart", label: "Winkelwagen", icon: "cart", group: order });
   if (can(user, "orders.view_own") || can(user, "orders.view_all"))
-    items.push({ href: "/orders", label: "Bestellingen", icon: "orders" });
+    items.push({ href: "/orders", label: "Bestellingen", icon: "orders", group: order });
   if (can(user, "orders.approve"))
-    items.push({ href: "/approvals", label: "Goedkeuringen", icon: "approvals" });
-  if (can(user, "users.view"))
-    items.push({ href: "/people", label: "Personeel", icon: "people" });
-  if (can(user, "roles.manage"))
-    items.push({ href: "/roles", label: "Rollen", icon: "roles" });
+    items.push({
+      href: "/approvals",
+      label: "Goedkeuringen",
+      icon: "approvals",
+      group: manage,
+      badge: waiting,
+    });
+  if (can(user, "users.view") || can(user, "roles.manage") || can(user, "settings.manage"))
+    items.push({ href: "/personeel", label: "Personeel", icon: "people", group: manage });
   if (can(user, "settings.manage"))
-    items.push({ href: "/budgets", label: "Regels & budget", icon: "rules" });
-  if (can(user, "settings.manage"))
-    items.push({ href: "/visibility", label: "Zichtbaarheid", icon: "visibility" });
-  if (can(user, "settings.manage"))
-    items.push({ href: "/settings", label: "Instellingen", icon: "settings" });
-  items.push({ href: "/profile", label: "Mijn profiel", icon: "profile" });
+    items.push({ href: "/settings", label: "Instellingen", icon: "settings", group: manage });
+  items.push({ href: "/profile", label: "Mijn profiel", icon: "profile", group: "Account" });
 
   return (
     <CartProvider companyId={user.company.id}>
