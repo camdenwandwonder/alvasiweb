@@ -391,18 +391,19 @@ In de popup achter **Bestelregels** (de balk bovenaan Personeel), in drie stappe
 
 ---
 
-## 9. Beslissingen voor Camden
+## 9. Besluiten (vastgesteld 27-10-2026)
 
-1. **Naam van de rollen:** "Functies" (begrijpelijker voor een monteur of verkoper) of
-   "Rollen" laten staan? Advies: **Functies**.
-2. **Budget per functie, uitzondering per persoon** als vaste regel? Advies: **ja**.
-3. **Bestelregels als balk** bovenaan in plaats van een eigen tab? Advies: **ja**.
-4. **Prijsmodel (§5): betaling en maxima als twee losse keuzes**, zodat "budget én
-   maximaal 2 jassen" kan? Advies: **ja**.
-5. **Credits afgeleid van een koers**, met handmatige uitzondering per product, in
-   plaats van losse creditwaarden die Alvasi per product invult? Advies: **ja**.
-6. **Producten zonder limiet** (bij maxima per product): standaard vrij te bestellen of
-   niet bestelbaar? Advies: **vrij**, met een duidelijke instelling.
-7. **Prijs bij aantallen:** standaard verbergen (aanzetbaar per organisatie)? Advies: **ja**.
-8. **Welke extra's uit fase 5** wil je, en in welke volgorde?
-9. **Wachtwoord:** handmatig blijven instellen, of (later) resetten via een e-maillink?
+| # | Onderwerp | Besluit |
+|---|---|---|
+| 1 | Naam van de rollen | **Functies** |
+| 2 | Budget en maxima | **Per functie, met zichtbare uitzondering per persoon**; altijd precies één regel |
+| 3 | Bedrijfsbrede bestelregels | **Balk bovenaan** de Personeel-pagina, wijzigen via popup |
+| 4 | Prijsmodel | **Twee losse keuzes**: betaling (geen budget / euro / credits) en maxima per product, combineerbaar |
+| 5 | Credits | **Koers per organisatie** (1 credit = € X), creditprijs = europrijs ÷ koers naar boven afgerond, per variant; handmatige uitzondering per product |
+| 6 | Producten zonder maximum | **Vrij te bestellen** (instelbaar per organisatie) |
+| 7 | Prijs bij geen budget + maxima | **Standaard verborgen**, per organisatie aan te zetten |
+| 8 | Extra's (fase 5) | **Meer budget aanvragen, welkomstpakket per functie, wijzigingsgeschiedenis, maandelijkse samenvatting.** Niet: Excel-import, naar rato budget, restant meenemen |
+| 9 | Wachtwoord | **Handmatig instellen, zoals nu** |
+
+Gevolg voor fase 5: de maandelijkse samenvatting en een mail bij een budgetaanvraag
+vereisen uitgaande e-mail (Resend: `RESEND_API_KEY`, `EMAIL_FROM` in Vercel).
