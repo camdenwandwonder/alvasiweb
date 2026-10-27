@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Inbox, Shield, Users } from "lucide-react";
+import { CalendarDays, Inbox, Shield, Users } from "lucide-react";
 import { NewUserDialog } from "@/components/user-dialogs";
 import { cn } from "@/lib/utils";
 import type { PersoneelData } from "@/lib/personeel/data";
@@ -11,9 +11,10 @@ import { PeopleTab } from "./people-tab";
 import { PersonDrawer } from "./person-drawer";
 import { RolesTab } from "./roles-tab";
 import { RoleDrawer } from "./role-drawer";
+import { MonthTab } from "./month-tab";
 import type { Perms } from "./helpers";
 
-export type WorkspaceTab = "medewerkers" | "functies";
+export type WorkspaceTab = "medewerkers" | "functies" | "overzicht";
 
 export function PersoneelWorkspace({
   data,
@@ -36,8 +37,13 @@ export function PersoneelWorkspace({
   /** Query key for the inner tab (the superadmin page uses "tab" itself). */
   tabParam?: string;
 }) {
+  const showMonth = perms.view || perms.settings;
   const [tab, setTab] = useState<WorkspaceTab>(
-    initial.tab === "functies" || (!perms.view && !initial.persoon) ? "functies" : "medewerkers",
+    initial.tab === "overzicht" && showMonth
+      ? "overzicht"
+      : initial.tab === "functies" || (!perms.view && !initial.persoon)
+        ? "functies"
+        : "medewerkers",
   );
   const [personId, setPersonId] = useState<string | null>(initial.persoon ?? null);
   const [roleId, setRoleId] = useState<string | null>(initial.functie ?? null);
@@ -71,9 +77,12 @@ export function PersoneelWorkspace({
   const person = personId ? data.people.find((p) => p.id === personId) : undefined;
   const role = roleId ? data.roles.find((r) => r.id === roleId) : undefined;
 
-  const tabs: { key: WorkspaceTab; label: string; count: number; icon: typeof Users }[] = [
+  const tabs: { key: WorkspaceTab; label: string; count?: number; icon: typeof Users }[] = [
     { key: "medewerkers", label: "Medewerkers", count: data.people.length, icon: Users },
     { key: "functies", label: "Functies", count: data.roles.length, icon: Shield },
+    ...(showMonth
+      ? [{ key: "overzicht" as const, label: "Maandoverzicht", icon: CalendarDays }]
+      : []),
   ];
 
   return (
@@ -134,15 +143,19 @@ export function PersoneelWorkspace({
           >
             <t.icon className="h-4 w-4" />
             {t.label}
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{t.count}</span>
+            {t.count != null ? (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{t.count}</span>
+            ) : null}
           </button>
         ))}
       </div>
 
       {tab === "medewerkers" ? (
         <PeopleTab data={data} perms={perms} currentUserId={currentUserId} onOpen={openPerson} />
-      ) : (
+      ) : tab === "functies" ? (
         <RolesTab data={data} perms={perms} onOpen={openRole} />
+      ) : (
+        <MonthTab data={data} approvalsHref={approvalsHref} onOpenPerson={openPerson} />
       )}
 
       {person ? (
