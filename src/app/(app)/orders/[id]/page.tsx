@@ -10,6 +10,7 @@ import { formatDate, ORDER_STATUS } from "@/lib/format";
 import { displayFor, formatValue, readOrderingSettings } from "@/lib/ordering";
 import { approveOrder, rejectOrder, decideProof } from "../actions";
 import { CancelOrderButton } from "./cancel-order-button";
+import { ReorderButton } from "@/components/orders/order-drawer";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,12 @@ export default async function OrderDetailPage({
     order.ordered_by === user?.id &&
     can(user, "orders.cancel") &&
     order.status === "pending_approval";
+  const canRefill =
+    order.ordered_by === user?.id &&
+    !!user?.companyId &&
+    order.company_id === user.companyId &&
+    can(user, "orders.create") &&
+    order.status === "rejected";
 
   const items = (order.items ?? []) as unknown as Item[];
   const status = ORDER_STATUS[order.status] ?? {
@@ -114,6 +121,7 @@ export default async function OrderDetailPage({
         <div className="flex items-center gap-2">
           <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
           {canCancel ? <CancelOrderButton orderId={order.id} /> : null}
+          {canRefill ? <ReorderButton orderId={order.id} label="Opnieuw in winkelwagen" /> : null}
           {canApprove && order.status === "pending_approval" ? (
             <>
               <form action={approveOrder.bind(null, order.id)}>

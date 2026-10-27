@@ -1,32 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  ShoppingCart,
-  Minus,
-  Plus,
-  Trash2,
-  Package,
+  AlertTriangle,
+  Check,
+  CheckCircle2,
   Loader2,
   MapPin,
-  Info,
+  PenLine,
+  ShieldCheck,
+  ShoppingCart,
   UserRound,
+  XCircle,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Field, NativeSelect } from "@/components/primitives";
-import { useCart, type CartItem } from "@/components/cart";
-import {
-  formatAmount,
-  formatValue,
-  type Display,
-  type PaymentMode,
-} from "@/lib/ordering";
+import { cn } from "@/lib/utils";
+import { useCart } from "@/components/cart";
+import { CartLine, SavedList } from "@/components/cart/cart-line";
+import { BudgetSummary } from "@/components/cart/cart-drawer";
+import { cartAmount } from "@/components/cart/cart-format";
+import { useCartCheck } from "@/components/cart/use-cart-check";
+import { RecipientSwitch, type RecipientOption } from "@/components/shop/recipient-switch";
 import { createOrderFromCart } from "./actions";
 
 export type DeliveryAddress = {
@@ -42,82 +41,63 @@ export type DeliveryAddress = {
 
 const CUSTOM = "__custom__";
 
-function addressLine(a: DeliveryAddress): string {
-  return (
-    [
-      a.recipient,
-      a.street,
-      [a.postal_code, a.city].filter(Boolean).join(" "),
-      a.country,
-    ]
-      .filter(Boolean)
-      .join(" · ") || "Geen adresgegevens"
-  );
-}
-
 export function CartClient({
   addresses,
-  display,
-  payment,
-  budgetRemaining,
-  recipient = null,
+  me,
+  recipient,
+  people,
 }: {
   addresses: DeliveryAddress[];
-  display: Display;
-  payment: PaymentMode;
-  budgetRemaining: number | null;
-  /** Set when a manager orders on behalf of this employee. */
-  recipient?: { name: string; roleName: string | null } | null;
+  me: string;
+  recipient: { id: string; name: string; roleName: string | null } | null;
+  /** People a manager may order for (null = no permission). */
+  people: RecipientOption[] | null;
 }) {
   const cart = useCart();
-  // Carts saved before credits existed lack a credit price per line; the
-  // server recalculates on checkout, so only the preview is affected.
-  const creditsKnown = cart.items.every((i) => i.unitCredits != null);
-  const showCredits = display === "credits" || display === "both";
-  function lineValue(i: CartItem): string {
-    if (showCredits && i.unitCredits == null)
-      return display === "both" ? formatValue(i.unitPrice * i.qty, 0, "euro") : "";
-    return formatValue(i.unitPrice * i.qty, (i.unitCredits ?? 0) * i.qty, display);
-  }
-  const totalLabel =
-    showCredits && !creditsKnown
-      ? display === "both"
-        ? formatValue(cart.subtotal, 0, "euro")
-        : "Wordt berekend bij plaatsen"
-      : formatValue(cart.subtotal, cart.creditsSubtotal, display);
-  const spend = payment === "credits" ? cart.creditsSubtotal : cart.subtotal;
-  const overBudget =
-    budgetRemaining != null &&
-    (payment !== "credits" || creditsKnown) &&
-    spend > budgetRemaining + 1e-9;
   const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
-  const [requireReason, setRequireReason] = useState(false);
-  const [reason, setReason] = useState("");
-
   const hasAddresses = addresses.length > 0;
-  const defaultAddr = addresses.find((a) => a.is_default) ?? addresses[0];
   const [selection, setSelection] = useState<string>(
-    hasAddresses ? (defaultAddr?.id ?? CUSTOM) : CUSTOM,
+    hasAddresses ? (addresses.find((a) => a.is_default) ?? addresses[0])!.id : CUSTOM,
   );
-  const [ship, setShip] = useState({
-    name: "",
-    address: "",
-    postal: "",
-    city: "",
-    country: "",
-  });
-  const [note, setNote] = useState("");
-
   const isCustom = selection === CUSTOM;
-  const selectedAddress = addresses.find((a) => a.id === selection) ?? null;
-  // A manual address counts as a deviation only when standard addresses exist.
-  const willNeedApproval = isCustom && hasAddresses;
+  const [ship, setShip] = useState({ name: "", address: "", postal: "", city: "", country: "" });
+  const [note, setNote] = useState("");
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const clientKey = useRef<string>(
+    typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()),
+  );
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
 
-  async function checkout(e: React.FormEvent) {
-    e.preventDefault();
-    if (requireReason && !reason.trim()) {
-      toast.error("Geef een reden op voor je aanvraag.");
+  const { check, error, loading, lineCheck } = useCartCheck({
+    addressId: isCustom ? null : selection,
+    custom: isCustom,
+  });
+  const unavailable = check?.lines.filter((l) => !l.available) ?? [];
+  const customIncomplete = isCustom && (!ship.address.trim() || !ship.city.trim());
+  const isRequest = !!check?.approval.required;
+  const total = cartAmount(
+    check?.totals.euro ?? cart.subtotal,
+    check?.totals.credits ?? cart.creditsSubtotal,
+    cart.display,
+    cart.payment,
+  );
+  const blocked =
+    check?.blocked ??
+    (unavailable.length
+      ? `Verwijder eerst ${unavailable.length === 1 ? "het product dat" : "de producten die"} niet meer beschikbaar ${
+          unavailable.length === 1 ? "is" : "zijn"
+        }.`
+      : customIncomplete
+        ? "Vul het afwijkende leveradres in (straat en plaats)."
+        : null);
+
+  async function submit() {
+    if (blocked || submitting) return;
+    if (check?.reasonRequired && !reason.trim()) {
+      setReasonError(true);
+      reasonRef.current?.focus();
       return;
     }
     setSubmitting(true);
@@ -134,288 +114,318 @@ export function CartClient({
           custom: isCustom ? ship : undefined,
           note: note.trim() || undefined,
         },
-        { reason: reason.trim() || undefined },
+        { reason: reason.trim() || undefined, clientKey: clientKey.current },
       );
       if (!res.ok) {
         if (res.code === "reason_required") {
-          setRequireReason(true);
-          toast.warning(
-            "Je budget/limiet is bereikt. Geef een reden op om dit aan te vragen.",
-          );
-        } else {
-          toast.error(res.error);
-        }
+          setReasonError(true);
+          reasonRef.current?.focus();
+        } else toast.error(res.error);
         setSubmitting(false);
         return;
       }
       cart.clear();
-      toast.success(
-        res.isRequest ? "Aanvraag ingediend" : "Bestelling geplaatst",
-      );
-      router.push(`/orders/${res.orderId}`);
+      router.push(`/bestelling-geplaatst/${res.orderId}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Er ging iets mis");
+      toast.error(err instanceof Error ? err.message : "Er ging iets mis. Probeer het opnieuw.");
       setSubmitting(false);
     }
   }
 
+  const header = (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-2">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Bestelling afronden</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Controleer je bestelling. Er is nog niets verstuurd.
+        </p>
+      </div>
+    </div>
+  );
+
+  const forBlock = recipient || people ? (
+    <Section icon={UserRound} title="Voor wie">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm">
+          {recipient ? (
+            <>
+              <span className="font-medium">{recipient.name}</span>
+              {recipient.roleName ? <span className="text-muted-foreground"> · {recipient.roleName}</span> : null}
+              <span className="text-muted-foreground"> (namens jou). Het budget en de maxima van deze medewerker gelden.</span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium">Jezelf</span>
+              <span className="text-muted-foreground"> · {me}</span>
+            </>
+          )}
+        </p>
+        {people && people.length ? (
+          <RecipientSwitch
+            people={people}
+            current={recipient ? { id: recipient.id, name: recipient.name } : null}
+          />
+        ) : null}
+      </div>
+    </Section>
+  ) : null;
+
   if (cart.items.length === 0) {
     return (
-      <div>
-        <h1 className="mb-6 text-2xl font-semibold tracking-tight">
-          Winkelwagen
-        </h1>
-        {recipient ? (
-          <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--brand)]/40 bg-[var(--brand)]/10 px-4 py-3 text-sm">
-            <UserRound className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              <span className="font-medium">Je bestelt voor {recipient.name}</span>
-              {recipient.roleName ? ` (${recipient.roleName})` : ""}. Het budget en de
-              maxima van deze medewerker gelden, en de bestelling komt op zijn of haar naam.
-            </p>
-          </div>
-        ) : null}
+      <div className="mx-auto max-w-3xl">
+        {header}
+        {forBlock}
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
           <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <ShoppingCart className="h-5 w-5" />
           </span>
           <p className="font-medium">Je winkelwagen is leeg</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Voeg producten toe vanuit de winkel.
-          </p>
-          <Link href="/products" className={`mt-4 ${buttonVariants()}`}>
+          <p className="mt-1 text-sm text-muted-foreground">Kies producten in de winkel.</p>
+          <Link href="/products" className={cn("mt-4", buttonVariants())}>
             Naar de winkel
           </Link>
         </div>
+        <SavedList />
       </div>
     );
   }
 
+  const submitLabel = isRequest ? "Aanvraag indienen" : "Bestelling plaatsen";
+
   return (
-    <div>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Winkelwagen</h1>
-      {recipient ? (
-        <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--brand)]/40 bg-[var(--brand)]/10 px-4 py-3 text-sm">
-          <UserRound className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            <span className="font-medium">Je bestelt voor {recipient.name}</span>
-            {recipient.roleName ? ` (${recipient.roleName})` : ""}. Het budget en de
-            maxima van deze medewerker gelden, en de bestelling komt op zijn of haar naam.
-          </p>
-        </div>
-      ) : null}
+    <div className="pb-24 lg:pb-0">
+      {header}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="space-y-5">
+          {forBlock}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        {/* Items */}
-        <ul className="space-y-3">
-          {cart.items.map((i) => (
-            <li
-              key={`${i.productId}-${i.variantId ?? ""}`}
-              className="flex gap-4 rounded-xl border bg-card p-3"
-            >
-              {i.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={i.image}
-                  alt={i.name}
-                  className="h-20 w-20 shrink-0 rounded-lg object-cover"
+          <Section icon={ShoppingCart} title={`Producten (${cart.count})`}>
+            <ul className="divide-y">
+              {cart.items.map((i, idx) => (
+                <CartLine
+                  key={`${i.productId}-${i.variantId ?? ""}`}
+                  item={i}
+                  index={idx}
+                  check={lineCheck(i.productId, i.variantId)}
+                  full
                 />
-              ) : (
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                  <Package className="h-6 w-6" />
-                </div>
-              )}
-              <div className="flex flex-1 flex-col">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium">{i.name}</p>
-                    {i.variantLabel ? (
-                      <p className="text-xs text-muted-foreground">
-                        {i.variantLabel}
-                      </p>
-                    ) : null}
-                  </div>
-                  <button
-                    onClick={() => cart.removeItem(i.productId, i.variantId)}
-                    className="text-muted-foreground hover:text-destructive"
-                    aria-label="Verwijderen"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="mt-auto flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={() =>
-                        cart.setQty(i.productId, i.variantId, i.qty - 1)
-                      }
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="w-8 text-center text-sm">{i.qty}</span>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={() =>
-                        cart.setQty(i.productId, i.variantId, i.qty + 1)
-                      }
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <span className="text-sm font-medium">{lineValue(i)}</span>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+              ))}
+            </ul>
+            <SavedList />
+          </Section>
 
-        {/* Checkout */}
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle className="text-base">Afrekenen</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {display !== "hidden" ? (
-              <div className="mb-4 border-b pb-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Totaal</span>
-                  <span className="text-lg font-semibold">{totalLabel}</span>
-                </div>
-                {budgetRemaining != null ? (
-                  <p
-                    className={`mt-1 text-right text-xs ${
-                      overBudget ? "text-amber-700" : "text-muted-foreground"
-                    }`}
-                  >
-                    {overBudget
-                      ? `Meer dan ${recipient ? "het" : "je"} resterende ${formatAmount(budgetRemaining, payment)} — dit wordt een aanvraag`
-                      : `Nog ${formatAmount(budgetRemaining, payment)} beschikbaar${recipient ? ` voor ${recipient.name}` : ""}`}
-                  </p>
-                ) : null}
+          <Section icon={MapPin} title="Levering">
+            <div role="radiogroup" aria-label="Leveradres" className="grid gap-2 sm:grid-cols-2">
+              {addresses.map((a) => (
+                <AddressCard
+                  key={a.id}
+                  selected={selection === a.id}
+                  onSelect={() => setSelection(a.id)}
+                  title={`${a.label}${a.is_default ? " (standaard)" : ""}`}
+                  lines={[a.recipient, a.street, [a.postal_code, a.city].filter(Boolean).join(" ")]}
+                />
+              ))}
+              <AddressCard
+                selected={isCustom}
+                onSelect={() => setSelection(CUSTOM)}
+                title="Ander adres"
+                lines={[hasAddresses ? "Een ander adres moet worden goedgekeurd" : "Vul het leveradres in"]}
+                warn={hasAddresses}
+              />
+            </div>
+            {isCustom ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Input placeholder="Naam ontvanger" value={ship.name} onChange={(e) => setShip({ ...ship, name: e.target.value })} aria-label="Naam ontvanger" />
+                <Input placeholder="Straat en huisnummer" value={ship.address} onChange={(e) => setShip({ ...ship, address: e.target.value })} aria-label="Straat en huisnummer" />
+                <Input placeholder="Postcode" value={ship.postal} onChange={(e) => setShip({ ...ship, postal: e.target.value })} aria-label="Postcode" />
+                <Input placeholder="Plaats" value={ship.city} onChange={(e) => setShip({ ...ship, city: e.target.value })} aria-label="Plaats" />
+                <Input placeholder="Land (optioneel)" value={ship.country} onChange={(e) => setShip({ ...ship, country: e.target.value })} aria-label="Land" className="sm:col-span-2" />
               </div>
             ) : null}
-            <form onSubmit={checkout} className="space-y-3">
-              {hasAddresses ? (
-                <Field label="Leveradres">
-                  <NativeSelect
-                    value={selection}
-                    onChange={(e) => setSelection(e.target.value)}
-                  >
-                    {addresses.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.label}
-                        {a.is_default ? " (standaard)" : ""}
-                      </option>
-                    ))}
-                    <option value={CUSTOM}>Ander adres (handmatig)…</option>
-                  </NativeSelect>
-                </Field>
+          </Section>
+
+          <Section icon={PenLine} title="Opmerking" optional>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="Bijvoorbeeld: graag afleveren bij de receptie"
+              aria-label="Opmerking"
+            />
+          </Section>
+        </div>
+
+        {/* Overzicht */}
+        <aside className="space-y-4 rounded-xl border bg-card p-5 lg:sticky lg:top-20">
+          <h2 className="text-base font-semibold">Overzicht</h2>
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm text-muted-foreground">
+              {cart.count} {cart.count === 1 ? "artikel" : "artikelen"}
+            </span>
+            <span className="flex items-center gap-2 text-xl font-semibold tabular-nums">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+              {total}
+            </span>
+          </div>
+
+          <BudgetSummary check={check} />
+
+          {check ? (
+            isRequest ? (
+              <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">
+                <p className="flex items-center gap-2 font-medium">
+                  <ShieldCheck className="h-4 w-4" /> Gaat ter goedkeuring
+                </p>
+                <p className="mt-1 text-amber-900">
+                  {check.approval.approvers.length
+                    ? `${check.approval.approvers.join(" of ")} beoordeelt deze aanvraag, omdat:`
+                    : "Je leidinggevende beoordeelt deze aanvraag, omdat:"}
+                </p>
+                <ul className="mt-1 list-disc pl-5 text-amber-900">
+                  {check.approval.reasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-900">
+                <CheckCircle2 className="h-4 w-4" /> Gaat direct door, zonder goedkeuring
+              </p>
+            )
+          ) : null}
+
+          {check?.reasonRequired ? (
+            <div>
+              <label htmlFor="reden" className="mb-1.5 block text-sm font-medium">
+                Waarom heb je meer nodig dan je budget?
+              </label>
+              <Textarea
+                id="reden"
+                ref={reasonRef}
+                rows={3}
+                value={reason}
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  setReasonError(false);
+                }}
+                aria-invalid={reasonError}
+                aria-describedby={reasonError ? "reden-fout" : undefined}
+                placeholder="Bijvoorbeeld: nieuwe werkzaamheden waarvoor extra kleding nodig is"
+              />
+              {reasonError ? (
+                <p id="reden-fout" className="mt-1 text-sm text-red-700">
+                  Geef een reden op waarom je boven je budget bestelt.
+                </p>
               ) : null}
+            </div>
+          ) : null}
 
-              {/* Saved address summary */}
-              {!isCustom && selectedAddress ? (
-                <div className="flex gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">{selectedAddress.label}</p>
-                    <p className="text-muted-foreground">
-                      {addressLine(selectedAddress)}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
+          {error ? (
+            <p className="flex items-start gap-2 text-sm text-red-700">
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              {error}
+            </p>
+          ) : null}
+          {blocked ? (
+            <p className="flex items-start gap-2 text-sm text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {blocked}
+            </p>
+          ) : null}
 
-              {/* Manual address fields */}
-              {isCustom ? (
-                <>
-                  {willNeedApproval ? (
-                    <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-                      <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>
-                        Een afwijkend leveradres moet eerst worden goedgekeurd
-                        voordat de bestelling wordt verwerkt.
-                      </span>
-                    </div>
-                  ) : null}
-                  <Field label="Leveradres — naam">
-                    <Input
-                      value={ship.name}
-                      onChange={(e) =>
-                        setShip({ ...ship, name: e.target.value })
-                      }
-                      placeholder="Ontvanger"
-                    />
-                  </Field>
-                  <Field label="Adres">
-                    <Input
-                      value={ship.address}
-                      onChange={(e) =>
-                        setShip({ ...ship, address: e.target.value })
-                      }
-                      placeholder="Straat en nummer"
-                    />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Postcode">
-                      <Input
-                        value={ship.postal}
-                        onChange={(e) =>
-                          setShip({ ...ship, postal: e.target.value })
-                        }
-                      />
-                    </Field>
-                    <Field label="Plaats">
-                      <Input
-                        value={ship.city}
-                        onChange={(e) =>
-                          setShip({ ...ship, city: e.target.value })
-                        }
-                      />
-                    </Field>
-                  </div>
-                </>
-              ) : null}
+          <Button
+            size="lg"
+            className="hidden w-full lg:inline-flex"
+            onClick={submit}
+            disabled={!!blocked || submitting || !check}
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {submitLabel}
+          </Button>
+          <Link href="/products" className="block text-center text-sm text-muted-foreground hover:text-foreground">
+            Verder winkelen
+          </Link>
+        </aside>
+      </div>
 
-              <Field label="Notitie (optioneel)">
-                <Textarea
-                  rows={2}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </Field>
-
-              {requireReason ? (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
-                  <p className="mb-2 text-sm font-medium text-amber-800">
-                    Budget/limiet bereikt — dien een aanvraag in
-                  </p>
-                  <Field label="Reden voor aanvraag">
-                    <Textarea
-                      rows={2}
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Bijv. extra jas nodig wegens beschadiging"
-                      required
-                    />
-                  </Field>
-                </div>
-              ) : null}
-
-              <Button type="submit" disabled={submitting} className="w-full">
-                {submitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : null}
-                {requireReason || willNeedApproval
-                  ? "Bestelling aanvragen"
-                  : "Bestelling plaatsen"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+      {/* Mobiel: knop altijd onderin */}
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">{cart.count} artikelen</p>
+          {total ? <p className="font-semibold tabular-nums">{total}</p> : null}
+        </div>
+        <Button size="lg" onClick={submit} disabled={!!blocked || submitting || !check}>
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {submitLabel}
+        </Button>
       </div>
     </div>
+  );
+}
+
+function Section({
+  icon: Icon,
+  title,
+  optional,
+  children,
+}: {
+  icon: typeof MapPin;
+  title: string;
+  optional?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border bg-card p-5">
+      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        {title}
+        {optional ? <span className="text-sm font-normal text-muted-foreground">(optioneel)</span> : null}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function AddressCard({
+  selected,
+  onSelect,
+  title,
+  lines,
+  warn,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  title: string;
+  lines: (string | null)[];
+  warn?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cn(
+        "flex items-start gap-3 rounded-lg border p-3 text-left text-sm transition",
+        selected ? "border-[var(--brand)] bg-[var(--brand)]/5 ring-1 ring-[var(--brand)]" : "hover:bg-muted/50",
+      )}
+    >
+      <span
+        className={cn(
+          "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+          selected && "border-[var(--brand)]",
+        )}
+      >
+        {selected ? <span className="h-2 w-2 rounded-full bg-[var(--brand)]" /> : null}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-medium">{title}</span>
+        {lines.filter(Boolean).map((l, i) => (
+          <span key={i} className={cn("block", warn ? "text-amber-700" : "text-muted-foreground")}>
+            {l}
+          </span>
+        ))}
+      </span>
+    </button>
   );
 }

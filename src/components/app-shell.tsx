@@ -7,6 +7,8 @@ import { Separator } from "@/components/ui/separator";
 import { AppSidebar, type SidebarNavItem } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { CartButton } from "@/components/cart/cart-button";
+import { CartDrawer } from "@/components/cart/cart-drawer";
 
 export function AppShell({
   brandName,
@@ -18,6 +20,7 @@ export function AppShell({
   userName,
   userEmail,
   accountHref,
+  showCart = false,
   children,
 }: {
   brandName: string;
@@ -29,6 +32,8 @@ export function AppShell({
   userName: string;
   userEmail: string;
   accountHref: string;
+  /** Cart button in the header plus its drawer (ordering users only). */
+  showCart?: boolean;
   children: React.ReactNode;
 }) {
   const brand = primaryColor ?? "#0f172a";
@@ -65,7 +70,9 @@ export function AppShell({
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 h-5" />
           <Breadcrumbs />
+          {showCart ? <CartButton /> : null}
         </header>
+        {showCart ? <CartDrawer /> : null}
         <div className="p-4 md:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>

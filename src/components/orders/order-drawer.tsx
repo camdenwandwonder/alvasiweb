@@ -342,7 +342,13 @@ function Footer({
           Annuleren
         </Button>
       ) : null}
-      {order.can.reorder ? <ReorderButton orderId={order.id} onDone={onClose} /> : null}
+      {order.can.reorder ? (
+        <ReorderButton
+          orderId={order.id}
+          onDone={onClose}
+          label={order.status === "rejected" ? "Opnieuw in winkelwagen" : "Opnieuw bestellen"}
+        />
+      ) : null}
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
       <div className="ml-auto flex gap-1">
         <a
@@ -361,7 +367,15 @@ function Footer({
   );
 }
 
-function ReorderButton({ orderId, onDone }: { orderId: string; onDone: () => void }) {
+export function ReorderButton({
+  orderId,
+  onDone,
+  label = "Opnieuw bestellen",
+}: {
+  orderId: string;
+  onDone?: () => void;
+  label?: string;
+}) {
   const cart = useCart();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -382,13 +396,13 @@ function ReorderButton({ orderId, onDone }: { orderId: string; onDone: () => voi
             toast.warning(`Niet meer beschikbaar: ${res.skipped.join(", ")}`);
           if (res.items.length) {
             toast.success("Toegevoegd aan je winkelwagen");
-            onDone();
+            onDone?.();
             router.push("/cart");
           }
         })
       }
     >
-      <RotateCcw className="h-4 w-4" /> Opnieuw bestellen
+      <RotateCcw className="h-4 w-4" /> {label}
     </Button>
   );
 }

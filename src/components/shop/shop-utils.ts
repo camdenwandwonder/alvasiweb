@@ -1,7 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { useCart } from "@/components/cart";
 import { variantLabel } from "@/lib/format";
 import { formatValue, PERIOD_LABEL, type Display, type Period } from "@/lib/ordering";
@@ -100,11 +98,10 @@ export function colorHex(name: string): string | null {
   return COLOR_HEX[name.trim().toLowerCase()] ?? null;
 }
 
-/** Adds a product line to the cart with a toast that links to the cart. */
+/** Adds a product line to the cart; the header button and drawer confirm it. */
 export function useAddToCart() {
   const cart = useCart();
-  const router = useRouter();
-  return (p: ShopProduct, variant: ShopVariant | null, qty: number, silent = false) => {
+  return (p: ShopProduct, variant: ShopVariant | null, qty: number, _silent = false) => {
     cart.addItem({
       productId: p.id,
       variantId: variant?.id ?? null,
@@ -115,11 +112,6 @@ export function useAddToCart() {
       image: p.images[0]?.url ?? null,
       qty,
     });
-    if (!silent)
-      toast.success(`${qty > 1 ? `${qty}× ` : ""}${p.name} in je winkelwagen`, {
-        description: variant ? shortVariant(variantLabel(variant.attributes)) : undefined,
-        action: { label: "Bekijk winkelwagen", onClick: () => router.push("/cart") },
-      });
   };
 }
 

@@ -33,7 +33,7 @@ export function ShopPreview({
       </div>
 
       {/* Own (empty) cart so the preview never touches anyone's real cart. */}
-      <CartProvider companyId="winkelvoorbeeld">
+      <CartProvider companyId="winkelvoorbeeld" sync={false}>
         <ShopView
           data={shop}
           canOrder={false}

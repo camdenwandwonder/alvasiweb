@@ -6,6 +6,7 @@ import { CartProvider } from "@/components/cart";
 import type { SidebarNavItem } from "@/components/app-sidebar";
 import { RecipientBar } from "@/components/recipient-bar";
 import { getOrderRecipient } from "@/lib/shop/recipient";
+import { displayFor, readOrderingSettings } from "@/lib/ordering";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,12 @@ export default async function AppLayout({
     );
   }
 
-  const recipient = await getOrderRecipient(user);
+  const [recipient, { data: companyRow }] = await Promise.all([
+    getOrderRecipient(user),
+    createAdminClient().from("companies").select("settings").eq("id", user.company.id).maybeSingle(),
+  ]);
+  const ordering = readOrderingSettings((companyRow?.settings as Record<string, unknown>) ?? {});
+  const canOrder = can(user, "orders.create");
 
   // Waiting approvals (orders + budget requests) for the menu badge.
   let waiting = 0;
@@ -80,7 +86,14 @@ export default async function AppLayout({
   items.push({ href: "/profile", label: "Mijn profiel", icon: "profile", group: "Account" });
 
   return (
-    <CartProvider companyId={user.company.id} recipientId={recipient?.id ?? null}>
+    <CartProvider
+      companyId={user.company.id}
+      recipientId={recipient?.id ?? null}
+      forName={recipient ? recipient.name.split(" ")[0]! : null}
+      display={displayFor(ordering, isMember(user) ? "member" : "manager")}
+      payment={ordering.payment}
+      sync={canOrder}
+    >
       <AppShell
         brandName={user.company.name}
         subtitle="Bestelportaal"
@@ -91,6 +104,7 @@ export default async function AppLayout({
         userName={user.fullName ?? ""}
         userEmail={user.email ?? ""}
         accountHref="/account"
+        showCart={canOrder}
       >
         {recipient ? <RecipientBar name={recipient.name} roleName={recipient.roleName} /> : null}
         {children}

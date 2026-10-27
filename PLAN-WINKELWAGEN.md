@@ -1,6 +1,6 @@
 # Plan: winkelwagen in de kop, een zijpaneel en een duidelijke afrondpagina
 
-Status: **plan, nog niet gebouwd** (28-10-2026).
+Status: **gebouwd** (28-10-2026), volgens de besluiten hieronder.
 
 Doel: altijd zichtbaar wat er in je winkelwagen zit en wat het kost. Snel iets weghalen of
 aanpassen zonder de winkel te verlaten. En een afrondpagina waarop je **vóór** je op de

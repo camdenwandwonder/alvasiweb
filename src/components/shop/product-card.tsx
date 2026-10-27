@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Heart, Package, Plus, Ruler } from "lucide-react";
+import { Check, Heart, Package, Plus, Ruler } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductImg } from "./product-img";
 import { toggleFavorite } from "@/lib/shop/actions";
@@ -156,6 +156,7 @@ export function ProductCard({
   onFavorite?: (on: boolean) => void;
 }) {
   const add = useAddToCart();
+  const [added, setAdded] = useState(false);
   const price = priceText(p, display);
   const cap = capText(p);
   const badges = productBadges(p);
@@ -254,11 +255,15 @@ export function ProductCard({
           {canQuick ? (
             <button
               type="button"
-              onClick={() => add(p, quick, 1)}
+              onClick={() => {
+                add(p, quick, 1);
+                setAdded(true);
+                setTimeout(() => setAdded(false), 1500);
+              }}
               className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--brand)] px-2 text-sm font-medium text-[var(--brand-foreground)] transition hover:opacity-90"
             >
-              <Plus className="h-4 w-4 shrink-0" />
-              <span className="truncate">{quickLabel}</span>
+              {added ? <Check className="h-4 w-4 shrink-0" /> : <Plus className="h-4 w-4 shrink-0" />}
+              <span className="truncate">{added ? "Toegevoegd" : quickLabel}</span>
             </button>
           ) : (
             <button

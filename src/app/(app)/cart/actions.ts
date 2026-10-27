@@ -1,22 +1,19 @@
 "use server";
 
 import { after } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
-import { getAllowanceFor } from "@/lib/allowance";
 import { logAudit } from "@/lib/company-gate";
-import { getOrderRecipient } from "@/lib/shop/recipient";
-import { variantLabel, formatPrice } from "@/lib/format";
-import { effectiveCredits, formatCredits, PERIOD_LABEL, type Period } from "@/lib/ordering";
-import { seesFullCatalogue } from "@/lib/permissions";
+import { formatPrice } from "@/lib/format";
+import { formatCredits } from "@/lib/ordering";
 import { sendEmail } from "@/lib/email";
 import { processOrderSync } from "@/lib/jamespro/sync";
+import { runCart } from "@/lib/cart/evaluate";
+import type { CartLineInput } from "@/lib/cart/types";
 
-export type CheckoutItem = {
-  productId: string;
-  variantId: string | null;
+export type CheckoutItem = CartLineInput & {
   variantLabel?: string | null;
-  qty: number;
 };
 
 export type ShipTo = {
@@ -37,43 +34,28 @@ export type Delivery = {
 };
 
 export type CheckoutResult =
-  | { ok: true; orderId: string; isRequest: boolean }
+  | { ok: true; orderId: string; isRequest: boolean; orderNumber: string | null }
   | { ok: false; error: string; code?: "reason_required" };
 
-type ProductRow = {
-  id: string;
-  name: string;
-  sku: string | null;
-  status: string;
-  base_price: number | null;
-  credit_cost: number | null;
-  credit_cost_manual: boolean;
-  category_id: string | null;
-  max_quantity_per_order: number | null;
-  variants: {
-    id: string;
-    attributes: Record<string, unknown>;
-    sku: string | null;
-    price_override: number | null;
-    credit_cost: number | null;
-  }[];
-};
-
 /**
- * Creates one order from the cart. Euro prices and credits are recomputed
- * server-side (never trusted from the browser) and the order is written with
- * the admin client after checking access, visibility, budget and maxima.
+ * Creates one order from the cart. All rules (availability, prices, maxima,
+ * budget, approval) come from `runCart`, the same function the checkout page
+ * uses for its preview, so what was shown is what happens. Prices are always
+ * recomputed on the server and the order is written with the admin client.
  * Going over budget needs a written reason; going over a maximum or using a
  * custom address turns the order into a request that needs approval.
  *
  * A manager with "bestellen namens" may order for an employee (chosen via the
  * validated cookie, never from the browser): then the employee's catalogue,
  * budget and maxima apply and the order is theirs, placed by the manager.
+ *
+ * `clientKey` makes placing idempotent: a second submit with the same key
+ * returns the first order instead of creating another one.
  */
 export async function createOrderFromCart(
   items: CheckoutItem[],
   delivery: Delivery,
-  options?: { reason?: string },
+  options?: { reason?: string; clientKey?: string },
 ): Promise<CheckoutResult> {
   const user = await getCurrentUser();
   if (!user?.companyId || !can(user, "orders.create"))
@@ -82,30 +64,15 @@ export async function createOrderFromCart(
 
   const companyId = user.companyId;
   const admin = createAdminClient();
+  const clientKey = options?.clientKey?.trim().slice(0, 100) || null;
 
-  // Who the order is for: the employee when ordering on behalf, else oneself.
-  const recipient = await getOrderRecipient(user);
-  const orderer = recipient
-    ? {
-        id: recipient.id,
-        roleId: recipient.roleId,
-        permissions: recipient.permissions,
-        name: recipient.name,
-        email: recipient.email,
-      }
-    : {
-        id: user.id,
-        roleId: user.roleId,
-        permissions: user.permissions,
-        name: user.fullName ?? user.email ?? "",
-        email: user.email,
-      };
+  const existing = clientKey ? await findByKey(user.id, clientKey) : null;
+  if (existing) return existing;
 
   // Delivery address: a saved company address is trusted; a manual address is
   // a deviation (needs approval) only when saved addresses exist.
   const note = delivery.note?.trim() || null;
   let shipTo: ShipTo = {};
-  let addressIsCustom = false;
   if (delivery.addressId) {
     const { data: addr } = await admin
       .from("company_addresses")
@@ -123,136 +90,18 @@ export async function createOrderFromCart(
     };
   } else {
     shipTo = delivery.custom ?? {};
-    const { count } = await admin
-      .from("company_addresses")
-      .select("id", { count: "exact", head: true })
-      .eq("company_id", companyId);
-    addressIsCustom = (count ?? 0) > 0;
   }
 
-  const productIds = [...new Set(items.map((i) => i.productId))];
-  const [{ data: productData }, { data: rules }, { settings, allowance }] = await Promise.all([
-    admin
-      .from("products")
-      .select(
-        "id, name, sku, status, base_price, credit_cost, credit_cost_manual, category_id, max_quantity_per_order, variants:product_variants(id, attributes, sku, price_override, credit_cost)",
-      )
-      .eq("company_id", companyId)
-      .in("id", productIds),
-    admin
-      .from("category_role_visibility")
-      .select("category_id, role_id")
-      .eq("company_id", companyId),
-    getAllowanceFor(companyId, orderer.id),
-  ]);
-  const products = new Map(
-    ((productData ?? []) as unknown as ProductRow[]).map((p) => [p.id, p]),
-  );
+  const run = await runCart(user, items, {
+    addressId: delivery.addressId ?? null,
+    custom: !delivery.addressId,
+  });
+  if (!("evaluation" in run)) return run;
+  const { recipient, orderer, settings, lines, subtotal, creditTotal, capReasons, overBudget, addressIsCustom } =
+    run;
 
-  // Same catalogue rule as the shop.
-  const restricted = new Map<string, Set<string>>();
-  for (const r of rules ?? []) {
-    const s = restricted.get(r.category_id) ?? new Set<string>();
-    s.add(r.role_id);
-    restricted.set(r.category_id, s);
-  }
-  const fullCatalogue = seesFullCatalogue(orderer.permissions);
-  const visible = (p: ProductRow) => {
-    if (fullCatalogue || !p.category_id) return true;
-    const set = restricted.get(p.category_id);
-    return !set || (!!orderer.roleId && set.has(orderer.roleId));
-  };
-
-  const rate = settings.creditRate;
-  const lines: {
-    product_id: string;
-    variant_id: string | null;
-    product_name: string;
-    variant_label: string | null;
-    sku: string | null;
-    quantity: number;
-    unit_price: number;
-    line_total: number;
-    credit_cost: number;
-  }[] = [];
-  let subtotal = 0;
-  let creditTotal = 0;
-  const qtyByProduct = new Map<string, number>();
-
-  for (const item of items) {
-    const p = products.get(item.productId);
-    if (!p || p.status !== "active" || !visible(p))
-      return {
-        ok: false,
-        error: recipient
-          ? `Een product in de winkelwagen is niet (meer) beschikbaar voor ${recipient.name}.`
-          : "Een product in je winkelwagen is niet (meer) beschikbaar.",
-      };
-
-    const qty = Math.max(1, Math.floor(item.qty));
-    if (p.max_quantity_per_order && qty > p.max_quantity_per_order)
-      return {
-        ok: false,
-        error: `Maximaal ${p.max_quantity_per_order} per bestelling voor ${p.name}`,
-      };
-
-    // Stale variant ids (catalogue regenerated) fall back to the product.
-    const variant = item.variantId
-      ? (p.variants.find((v) => v.id === item.variantId) ?? null)
-      : null;
-    const unitPrice =
-      variant?.price_override != null ? Number(variant.price_override) : Number(p.base_price ?? 0);
-    const unitCredits = effectiveCredits(p, variant, rate);
-
-    subtotal += unitPrice * qty;
-    creditTotal += unitCredits * qty;
-    qtyByProduct.set(p.id, (qtyByProduct.get(p.id) ?? 0) + qty);
-    lines.push({
-      product_id: p.id,
-      variant_id: variant?.id ?? null,
-      product_name: p.name,
-      variant_label: variant
-        ? variantLabel(variant.attributes)
-        : item.variantLabel?.trim() || null,
-      sku: variant?.sku ?? p.sku,
-      quantity: qty,
-      unit_price: unitPrice,
-      line_total: unitPrice * qty,
-      credit_cost: unitCredits,
-    });
-  }
-
-  // Maxima per product.
-  const capReasons: string[] = [];
-  if (allowance.capsEnabled) {
-    for (const [pid, qty] of qtyByProduct) {
-      const cap = allowance.caps[pid];
-      const name = products.get(pid)?.name ?? "product";
-      if (!cap) {
-        if (allowance.uncapped === "blocked")
-          return {
-            ok: false,
-            error: recipient
-              ? `${name} kan niet besteld worden: er is voor ${recipient.name} geen maximum ingesteld.`
-              : `${name} kun je niet bestellen: er is voor jou geen maximum ingesteld.`,
-          };
-        continue;
-      }
-      if (qty > cap.remaining) {
-        const period = PERIOD_LABEL[cap.period as Period] ?? "";
-        capReasons.push(
-          `Maximum overschreden: ${name} (${cap.used + qty} van ${cap.max} ${period})`.trim(),
-        );
-      }
-    }
-  }
-
-  // Budget in the payment unit (approved extra budget is included).
-  let overBudget = false;
-  if (allowance.budget) {
-    const spend = settings.payment === "credits" ? creditTotal : subtotal;
-    overBudget = spend > allowance.budget.remaining + 1e-9;
-  }
+  if (run.errors.length) return { ok: false, error: run.errors[0]! };
+  if (run.evaluation.blocked) return { ok: false, error: run.evaluation.blocked };
 
   const userReason = options?.reason?.trim() || null;
   if (overBudget && !userReason)
@@ -272,8 +121,12 @@ export async function createOrderFromCart(
       .join(", ");
     reasonParts.push(`Afwijkend leveradres${addrText ? `: ${addrText}` : ""}`);
   }
-  const isRequest = overBudget || capReasons.length > 0 || addressIsCustom;
+  if (run.approvalProducts.length)
+    reasonParts.push(`Altijd goedkeuring: ${run.approvalProducts.join(", ")}`);
+  const isRequest =
+    overBudget || capReasons.length > 0 || addressIsCustom || run.approvalProducts.length > 0;
   const finalReason = reasonParts.join(" · ") || null;
+  const rate = settings.creditRate;
 
   const { data: order, error: oErr } = await admin
     .from("orders")
@@ -294,11 +147,18 @@ export async function createOrderFromCart(
       credit_rate: settings.payment === "credits" ? rate : null,
       is_request: isRequest,
       request_reason: finalReason,
+      client_key: clientKey,
     })
     .select("id, order_number, status")
     .single();
-  if (oErr || !order)
+  if (oErr || !order) {
+    // A parallel submit with the same key won the race: return that order.
+    if (clientKey && oErr?.code === "23505") {
+      const won = await findByKey(user.id, clientKey);
+      if (won) return won;
+    }
     return { ok: false, error: `Bestelling mislukt: ${oErr?.message ?? "onbekend"}` };
+  }
 
   const { error: iErr } = await admin
     .from("order_items")
@@ -326,6 +186,11 @@ export async function createOrderFromCart(
       summary: `Bestelling ${order.order_number ?? "zonder nummer"} geplaatst door ${manager} namens ${recipient.name}.`,
     });
   }
+
+  // The cart is done: clear its server copy for this "voor wie".
+  let clear = admin.from("carts").delete().eq("user_id", user.id);
+  clear = recipient ? clear.eq("for_user_id", recipient.id) : clear.is("for_user_id", null);
+  await clear;
 
   const notifyTo = process.env.ALVASI_NOTIFY_EMAIL;
   if (notifyTo) {
@@ -360,5 +225,28 @@ export async function createOrderFromCart(
     });
   }
 
-  return { ok: true, orderId: order.id, isRequest };
+  revalidatePath("/orders");
+  revalidatePath("/approvals");
+  return {
+    ok: true,
+    orderId: order.id,
+    isRequest,
+    orderNumber: (order.order_number as string | null) ?? null,
+  };
+}
+
+async function findByKey(userId: string, clientKey: string): Promise<CheckoutResult | null> {
+  const { data } = await createAdminClient()
+    .from("orders")
+    .select("id, order_number, is_request")
+    .eq("placed_by", userId)
+    .eq("client_key", clientKey)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    ok: true,
+    orderId: data.id as string,
+    isRequest: !!data.is_request,
+    orderNumber: (data.order_number as string | null) ?? null,
+  };
 }
