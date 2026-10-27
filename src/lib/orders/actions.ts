@@ -22,6 +22,8 @@ export type OrderDetail = {
   ordered_by_email: string | null;
   role_name: string | null;
   approved_by_name: string | null;
+  /** Who placed the order when it was placed on behalf of the employee. */
+  placed_by_name: string | null;
   note: string | null;
   request_reason: string | null;
   is_request: boolean;
@@ -73,7 +75,7 @@ export async function getOrderDetail(
   const { data: o } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, created_at, decided_at, company_id, ordered_by, ordered_by_name, role_name, approved_by, note, request_reason, is_request, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, ship_to_country, ship_to_custom, total, credit_total, items:order_items(id, product_id, product_name, variant_label, sku, quantity, unit_price, line_total, credit_cost, created_at)",
+      "id, order_number, status, created_at, decided_at, company_id, ordered_by, ordered_by_name, role_name, approved_by, placed_by, note, request_reason, is_request, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, ship_to_country, ship_to_custom, total, credit_total, items:order_items(id, product_id, product_name, variant_label, sku, quantity, unit_price, line_total, credit_cost, created_at)",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -96,7 +98,7 @@ export async function getOrderDetail(
   const admin = createAdminClient();
   const personIds = [
     ...new Set(
-      [o.ordered_by, o.approved_by, ...(events ?? []).map((e) => e.actor)].filter(
+      [o.ordered_by, o.approved_by, o.placed_by, ...(events ?? []).map((e) => e.actor)].filter(
         (x): x is string => !!x,
       ),
     ),
@@ -150,6 +152,10 @@ export async function getOrderDetail(
       ordered_by_email: byId.get(o.ordered_by as string)?.email ?? null,
       role_name: (o.role_name as string | null) ?? null,
       approved_by_name: o.approved_by ? personName(byId.get(o.approved_by as string)) : null,
+      placed_by_name:
+        o.placed_by && o.placed_by !== o.ordered_by
+          ? personName(byId.get(o.placed_by as string))
+          : null,
       note: (o.note as string | null) ?? null,
       request_reason: (o.request_reason as string | null) ?? null,
       is_request: !!o.is_request,

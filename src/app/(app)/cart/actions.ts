@@ -3,7 +3,9 @@
 import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser, can } from "@/lib/auth/user";
-import { getAllowance } from "@/lib/allowance";
+import { getAllowanceFor } from "@/lib/allowance";
+import { logAudit } from "@/lib/company-gate";
+import { getOrderRecipient } from "@/lib/shop/recipient";
 import { variantLabel, formatPrice } from "@/lib/format";
 import { effectiveCredits, formatCredits, PERIOD_LABEL, type Period } from "@/lib/ordering";
 import { seesFullCatalogue } from "@/lib/permissions";
@@ -63,6 +65,10 @@ type ProductRow = {
  * the admin client after checking access, visibility, budget and maxima.
  * Going over budget needs a written reason; going over a maximum or using a
  * custom address turns the order into a request that needs approval.
+ *
+ * A manager with "bestellen namens" may order for an employee (chosen via the
+ * validated cookie, never from the browser): then the employee's catalogue,
+ * budget and maxima apply and the order is theirs, placed by the manager.
  */
 export async function createOrderFromCart(
   items: CheckoutItem[],
@@ -76,6 +82,24 @@ export async function createOrderFromCart(
 
   const companyId = user.companyId;
   const admin = createAdminClient();
+
+  // Who the order is for: the employee when ordering on behalf, else oneself.
+  const recipient = await getOrderRecipient(user);
+  const orderer = recipient
+    ? {
+        id: recipient.id,
+        roleId: recipient.roleId,
+        permissions: recipient.permissions,
+        name: recipient.name,
+        email: recipient.email,
+      }
+    : {
+        id: user.id,
+        roleId: user.roleId,
+        permissions: user.permissions,
+        name: user.fullName ?? user.email ?? "",
+        email: user.email,
+      };
 
   // Delivery address: a saved company address is trusted; a manual address is
   // a deviation (needs approval) only when saved addresses exist.
@@ -119,7 +143,7 @@ export async function createOrderFromCart(
       .from("category_role_visibility")
       .select("category_id, role_id")
       .eq("company_id", companyId),
-    getAllowance(user),
+    getAllowanceFor(companyId, orderer.id),
   ]);
   const products = new Map(
     ((productData ?? []) as unknown as ProductRow[]).map((p) => [p.id, p]),
@@ -132,11 +156,11 @@ export async function createOrderFromCart(
     s.add(r.role_id);
     restricted.set(r.category_id, s);
   }
-  const fullCatalogue = seesFullCatalogue(user.permissions);
+  const fullCatalogue = seesFullCatalogue(orderer.permissions);
   const visible = (p: ProductRow) => {
     if (fullCatalogue || !p.category_id) return true;
     const set = restricted.get(p.category_id);
-    return !set || (!!user.roleId && set.has(user.roleId));
+    return !set || (!!orderer.roleId && set.has(orderer.roleId));
   };
 
   const rate = settings.creditRate;
@@ -158,7 +182,12 @@ export async function createOrderFromCart(
   for (const item of items) {
     const p = products.get(item.productId);
     if (!p || p.status !== "active" || !visible(p))
-      return { ok: false, error: "Een product in je winkelwagen is niet (meer) beschikbaar." };
+      return {
+        ok: false,
+        error: recipient
+          ? `Een product in de winkelwagen is niet (meer) beschikbaar voor ${recipient.name}.`
+          : "Een product in je winkelwagen is niet (meer) beschikbaar.",
+      };
 
     const qty = Math.max(1, Math.floor(item.qty));
     if (p.max_quantity_per_order && qty > p.max_quantity_per_order)
@@ -203,7 +232,9 @@ export async function createOrderFromCart(
         if (allowance.uncapped === "blocked")
           return {
             ok: false,
-            error: `${name} kun je niet bestellen: er is voor jou geen maximum ingesteld.`,
+            error: recipient
+              ? `${name} kan niet besteld worden: er is voor ${recipient.name} geen maximum ingesteld.`
+              : `${name} kun je niet bestellen: er is voor jou geen maximum ingesteld.`,
           };
         continue;
       }
@@ -248,7 +279,8 @@ export async function createOrderFromCart(
     .from("orders")
     .insert({
       company_id: companyId,
-      ordered_by: user.id,
+      ordered_by: orderer.id,
+      placed_by: user.id,
       note,
       ship_to_name: shipTo.name?.trim() || null,
       ship_to_address: shipTo.address?.trim() || null,
@@ -277,6 +309,24 @@ export async function createOrderFromCart(
     return { ok: false, error: `Bestelregels mislukt: ${iErr.message}` };
   }
 
+  if (recipient) {
+    const manager = user.fullName ?? user.email ?? "Een manager";
+    await admin.from("order_events").insert({
+      order_id: order.id,
+      company_id: companyId,
+      actor: user.id,
+      note: `Geplaatst door ${manager} namens ${recipient.name}`,
+    });
+    await logAudit({
+      companyId,
+      actor: user,
+      targetType: "order",
+      targetId: order.id,
+      action: "bestellen_namens",
+      summary: `Bestelling ${order.order_number ?? "zonder nummer"} geplaatst door ${manager} namens ${recipient.name}.`,
+    });
+  }
+
   const notifyTo = process.env.ALVASI_NOTIFY_EMAIL;
   if (notifyTo) {
     const rows = lines
@@ -291,7 +341,9 @@ export async function createOrderFromCart(
       to: notifyTo,
       subject: `${isRequest ? "Aanvraag" : "Nieuwe bestelling"} ${order.order_number ?? ""} — ${user.company?.name ?? ""}`,
       html: `<h2>${isRequest ? "Aanvraag" : "Nieuwe bestelling"} ${order.order_number ?? ""}</h2>
-        <p>Bedrijf: ${user.company?.name ?? ""}<br/>Besteld door: ${user.fullName ?? user.email ?? ""}</p>
+        <p>Bedrijf: ${user.company?.name ?? ""}<br/>Besteld door: ${orderer.name}${
+          recipient ? `<br/>Geplaatst door: ${user.fullName ?? user.email ?? ""}` : ""
+        }</p>
         ${finalReason ? `<p>Reden: ${finalReason}</p>` : ""}
         <ul>${rows}</ul>
         <p><strong>Totaal: ${formatPrice(subtotal)}</strong>${

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getCurrentUser, can, isMember } from "@/lib/auth/user";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/primitives";
@@ -43,7 +43,7 @@ export default async function OrderDetailPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, created_at, note, subtotal, total, credit_total, ordered_by, company_id, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, items:order_items(product_name, variant_label, quantity, unit_price, line_total, credit_cost)",
+      "id, order_number, status, created_at, note, subtotal, total, credit_total, ordered_by, placed_by, ordered_by_name, company_id, ship_to_name, ship_to_address, ship_to_postal, ship_to_city, items:order_items(product_name, variant_label, quantity, unit_price, line_total, credit_cost)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -78,6 +78,18 @@ export default async function OrderDetailPage({
   };
   const canApprove = can(user, "orders.approve");
 
+  // Placed on the employee's behalf: show by whom (names via the admin client,
+  // the order itself is already authorised by RLS above).
+  let placedByName: string | null = null;
+  if (order.placed_by && order.placed_by !== order.ordered_by) {
+    const { data: p } = await createAdminClient()
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", order.placed_by)
+      .maybeSingle();
+    placedByName = (p?.full_name as string | null)?.trim() || (p?.email as string | null) || null;
+  }
+
   return (
     <div className="max-w-3xl">
       <Link
@@ -94,6 +106,9 @@ export default async function OrderDetailPage({
           </h1>
           <p className="text-sm text-muted-foreground">
             {formatDate(order.created_at)}
+            {placedByName
+              ? ` · voor ${order.ordered_by_name ?? "medewerker"}, geplaatst door ${placedByName}`
+              : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">

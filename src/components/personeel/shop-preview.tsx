@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft, Eye } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { ShopGrid } from "@/components/shop-grid";
-import { AllowanceBanner } from "@/components/allowance-banner";
+import { CartProvider } from "@/components/cart";
+import { ShopView } from "@/components/shop/shop-view";
 import type { ShopData } from "@/lib/shop";
 
 /** Read-only look at the shop exactly as one employee sees it. */
@@ -32,22 +32,18 @@ export function ShopPreview({
         </Link>
       </div>
 
-      <AllowanceBanner
-        settings={shop.settings}
-        allowance={shop.allowance}
-        display={shop.display}
-        missingSizes={shop.missingSizes}
-        canRequest={false}
-      />
-
-      <ShopGrid
-        products={shop.products}
-        categories={shop.categories}
-        display={shop.display}
-        canOrder={false}
-        preferredSizes={shop.preferredSizes}
-        preview
-      />
+      {/* Own (empty) cart so the preview never touches anyone's real cart. */}
+      <CartProvider companyId="winkelvoorbeeld">
+        <ShopView
+          data={shop}
+          canOrder={false}
+          preview
+          manager={false}
+          canRequest={false}
+          title="Winkel"
+          description={`Zo ziet ${name.split(" ")[0]} de winkel.`}
+        />
+      </CartProvider>
     </div>
   );
 }

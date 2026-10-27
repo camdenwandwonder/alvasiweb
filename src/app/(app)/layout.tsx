@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app-shell";
 import { CartProvider } from "@/components/cart";
 import type { SidebarNavItem } from "@/components/app-sidebar";
+import { RecipientBar } from "@/components/recipient-bar";
+import { getOrderRecipient } from "@/lib/shop/recipient";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,8 @@ export default async function AppLayout({
       </div>
     );
   }
+
+  const recipient = await getOrderRecipient(user);
 
   // Waiting approvals (orders + budget requests) for the menu badge.
   let waiting = 0;
@@ -76,7 +80,7 @@ export default async function AppLayout({
   items.push({ href: "/profile", label: "Mijn profiel", icon: "profile", group: "Account" });
 
   return (
-    <CartProvider companyId={user.company.id}>
+    <CartProvider companyId={user.company.id} recipientId={recipient?.id ?? null}>
       <AppShell
         brandName={user.company.name}
         subtitle="Bestelportaal"
@@ -88,6 +92,7 @@ export default async function AppLayout({
         userEmail={user.email ?? ""}
         accountHref="/account"
       >
+        {recipient ? <RecipientBar name={recipient.name} roleName={recipient.roleName} /> : null}
         {children}
       </AppShell>
     </CartProvider>

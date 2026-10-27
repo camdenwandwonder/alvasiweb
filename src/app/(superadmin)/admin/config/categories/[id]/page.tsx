@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Field, NativeSelect } from "@/components/primitives";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SizeChartEditor } from "@/components/size-chart-editor";
+import type { SizeChartInput } from "@/lib/size-chart-actions";
 import {
   updateCategory,
   deleteCategory,
@@ -63,6 +65,26 @@ export default async function CategoryEditPage({
   ]);
   if (!category) notFound();
   const axes = (axesData ?? []) as unknown as Axis[];
+  const sizeSetIds = axes
+    .map((a) => a.option_set)
+    .filter((s) => s?.kind === "size")
+    .map((s) => s!.id);
+  const { data: chartRows } = sizeSetIds.length
+    ? await admin
+        .from("size_charts")
+        .select("option_set_id, columns, rows, note")
+        .in("option_set_id", sizeSetIds)
+    : { data: [] };
+  const charts = new Map(
+    (chartRows ?? []).map((c) => [
+      c.option_set_id as string,
+      {
+        columns: (c.columns as string[]) ?? [],
+        rows: (c.rows as SizeChartInput["rows"]) ?? [],
+        note: (c.note as string | null) ?? null,
+      } satisfies SizeChartInput,
+    ]),
+  );
 
   return (
     <div className="max-w-3xl">
@@ -259,6 +281,24 @@ export default async function CategoryEditPage({
                           <Plus className="h-3.5 w-3.5" /> Toevoegen
                         </SubmitButton>
                       </form>
+
+                      {set.kind === "size" ? (
+                        <div className="mt-4 border-t pt-4">
+                          <p className="mb-1 text-sm font-medium">Maattabel</p>
+                          <p className="mb-3 text-xs text-muted-foreground">
+                            Staat bij de maatkeuze in de winkel voor alle producten met
+                            deze maten. Een product kan een eigen maattabel hebben.
+                          </p>
+                          <SizeChartEditor
+                            target={{ optionSetId: set.id }}
+                            sizes={[...set.values]
+                              .sort((x, y) => x.sort_order - y.sort_order)
+                              .map((v) => v.label ?? v.value)}
+                            initial={charts.get(set.id) ?? null}
+                            emptyText="Nog geen maattabel voor deze maten."
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}

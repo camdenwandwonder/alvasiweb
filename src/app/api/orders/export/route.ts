@@ -124,8 +124,10 @@ export async function GET(request: Request) {
           { header: "Leveradres", kind: "text", width: 32 },
           { header: "Afwijkend adres", kind: "text", width: 15 },
           { header: "Aanvraag", kind: "text", width: 10 },
+          { header: "Geplaatst door", kind: "text", width: 22 },
         ];
         const emails = own ? new Map<string, string>() : await emailsFor(rows.map((r) => r.ordered_by));
+        const placedBy = await placedByNames(rows);
         sheet = {
           columns,
           rows: rows.map((o) => [
@@ -143,6 +145,7 @@ export async function GET(request: Request) {
             o.address ?? "",
             yesNo(o.custom_address),
             yesNo(o.is_request),
+            placedBy.get(o.id) ?? "",
           ]),
         };
       } else {
@@ -309,6 +312,43 @@ export async function GET(request: Request) {
       "Content-Disposition": `attachment; filename="${base}.xlsx"`,
     },
   });
+}
+
+/**
+ * Order id → name of whoever placed it on the employee's behalf (only when that
+ * differs from the employee). The orders were already read through RLS.
+ */
+async function placedByNames(rows: OrderRow[]): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  if (!rows.length) return result;
+  const supabase = await createClient();
+  const placed = new Map<string, string>();
+  for (let i = 0; i < rows.length; i += 200) {
+    const { data } = await supabase
+      .from("orders")
+      .select("id, ordered_by, placed_by")
+      .in(
+        "id",
+        rows.slice(i, i + 200).map((r) => r.id),
+      )
+      .not("placed_by", "is", null);
+    for (const o of data ?? [])
+      if (o.placed_by && o.placed_by !== o.ordered_by) placed.set(o.id as string, o.placed_by as string);
+  }
+  const ids = [...new Set(placed.values())];
+  if (!ids.length) return result;
+  const { data: people } = await createAdminClient()
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", ids);
+  const nameOf = new Map(
+    (people ?? []).map((p) => [
+      p.id as string,
+      ((p.full_name as string | null)?.trim() || (p.email as string | null) || "") as string,
+    ]),
+  );
+  for (const [orderId, by] of placed) result.set(orderId, nameOf.get(by) ?? "");
+  return result;
 }
 
 async function emailsFor(ids: string[]): Promise<Map<string, string>> {

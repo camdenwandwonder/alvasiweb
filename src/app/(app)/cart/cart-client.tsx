@@ -13,6 +13,7 @@ import {
   Loader2,
   MapPin,
   Info,
+  UserRound,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -59,11 +60,14 @@ export function CartClient({
   display,
   payment,
   budgetRemaining,
+  recipient = null,
 }: {
   addresses: DeliveryAddress[];
   display: Display;
   payment: PaymentMode;
   budgetRemaining: number | null;
+  /** Set when a manager orders on behalf of this employee. */
+  recipient?: { name: string; roleName: string | null } | null;
 }) {
   const cart = useCart();
   // Carts saved before credits existed lack a credit price per line; the
@@ -161,6 +165,16 @@ export function CartClient({
         <h1 className="mb-6 text-2xl font-semibold tracking-tight">
           Winkelwagen
         </h1>
+        {recipient ? (
+          <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--brand)]/40 bg-[var(--brand)]/10 px-4 py-3 text-sm">
+            <UserRound className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              <span className="font-medium">Je bestelt voor {recipient.name}</span>
+              {recipient.roleName ? ` (${recipient.roleName})` : ""}. Het budget en de
+              maxima van deze medewerker gelden, en de bestelling komt op zijn of haar naam.
+            </p>
+          </div>
+        ) : null}
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
           <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <ShoppingCart className="h-5 w-5" />
@@ -180,6 +194,16 @@ export function CartClient({
   return (
     <div>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">Winkelwagen</h1>
+      {recipient ? (
+        <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--brand)]/40 bg-[var(--brand)]/10 px-4 py-3 text-sm">
+          <UserRound className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            <span className="font-medium">Je bestelt voor {recipient.name}</span>
+            {recipient.roleName ? ` (${recipient.roleName})` : ""}. Het budget en de
+            maxima van deze medewerker gelden, en de bestelling komt op zijn of haar naam.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* Items */}
@@ -267,8 +291,8 @@ export function CartClient({
                     }`}
                   >
                     {overBudget
-                      ? `Meer dan je resterende ${formatAmount(budgetRemaining, payment)} — dit wordt een aanvraag`
-                      : `Nog ${formatAmount(budgetRemaining, payment)} beschikbaar`}
+                      ? `Meer dan ${recipient ? "het" : "je"} resterende ${formatAmount(budgetRemaining, payment)} — dit wordt een aanvraag`
+                      : `Nog ${formatAmount(budgetRemaining, payment)} beschikbaar${recipient ? ` voor ${recipient.name}` : ""}`}
                   </p>
                 ) : null}
               </div>

@@ -32,6 +32,9 @@ export async function saveProduct(
     description: string | null;
     base_price: number | null;
     max_quantity_per_order: number | null;
+    lead_time_days?: number | null;
+    requires_proof?: boolean;
+    requires_approval_override?: boolean | null;
     regenVariants?: boolean;
     selections?: Record<string, string[]>;
   },
@@ -52,6 +55,18 @@ export async function saveProduct(
       // a product save must never overwrite them.
       base_price: payload.base_price,
       max_quantity_per_order: payload.max_quantity_per_order,
+      ...(payload.lead_time_days !== undefined
+        ? {
+            lead_time_days:
+              payload.lead_time_days != null && Number.isFinite(payload.lead_time_days)
+                ? Math.max(0, Math.round(payload.lead_time_days))
+                : null,
+          }
+        : {}),
+      ...(payload.requires_proof !== undefined ? { requires_proof: payload.requires_proof } : {}),
+      ...(payload.requires_approval_override !== undefined
+        ? { requires_approval_override: payload.requires_approval_override }
+        : {}),
     })
     .eq("id", productId);
 

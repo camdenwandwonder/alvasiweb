@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, History, Info, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, History, Info, Loader2, PackageOpen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,6 +44,7 @@ import {
 
 const PERIODS = Object.entries(PERIOD_LABEL) as [Period, string][];
 type Cap = { productId: string; max: number; period: string };
+type Assortment = { productId: string; kind: "aanbevolen" | "starterspakket"; quantity: number };
 
 export function RoleDrawer({
   data,
@@ -83,6 +84,10 @@ export function RoleDrawer({
         data.categories.map((c) => c.id),
         role,
       ),
+      products: data.roleProducts
+        .filter((r) => r.role_id === role.id)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map<Assortment>((r) => ({ productId: r.product_id, kind: r.kind, quantity: r.quantity })),
     };
   }, [data, role]);
 
@@ -128,6 +133,7 @@ export function RoleDrawer({
         budget: form.budgetAmount && amount > 0 ? { amount, period: form.budgetPeriod } : null,
         caps: form.caps,
         categories: form.categories,
+        products: canRules ? form.products : undefined,
       });
       if (res.ok) toast.success("Functie opgeslagen");
       else toast.error(res.error);
@@ -331,6 +337,18 @@ export function RoleDrawer({
                   })}
                 </div>
               )}
+            </Section>
+          ) : null}
+
+          {data.products.length ? (
+            <Section title="Assortiment voor deze functie" icon={PackageOpen}>
+              <AssortmentEditor
+                data={data}
+                items={form.products}
+                categories={fullCatalogue ? null : form.categories}
+                disabled={!canRules}
+                onChange={(products) => set("products", products)}
+              />
             </Section>
           ) : null}
 
@@ -666,5 +684,116 @@ function DeleteRoleDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AssortmentEditor({
+  data,
+  items,
+  categories,
+  disabled,
+  onChange,
+}: {
+  data: PersoneelData;
+  items: Assortment[];
+  /** Categories this functie sees (null = all). */
+  categories: string[] | null;
+  disabled: boolean;
+  onChange: (items: Assortment[]) => void;
+}) {
+  const used = new Set(items.map((i) => i.productId));
+  const free = data.products.filter((p) => !used.has(p.id));
+  const product = (id: string) => data.products.find((p) => p.id === id);
+  const hidden = (id: string) => {
+    const cat = product(id)?.category_id;
+    return !!cat && categories !== null && !categories.includes(cat);
+  };
+  const update = (productId: string, patch: Partial<Assortment>) =>
+    onChange(items.map((i) => (i.productId === productId ? { ...i, ...patch } : i)));
+
+  function list(kind: Assortment["kind"], title: string, empty: string) {
+    const rows = items.filter((i) => i.kind === kind);
+    const total = rows.reduce((s, r) => s + r.quantity, 0);
+    return (
+      <div>
+        <p className="mb-1.5 text-sm font-medium">
+          {title}
+          {kind === "starterspakket" && rows.length ? (
+            <span className="font-normal text-muted-foreground"> · {total} stuks</span>
+          ) : null}
+        </p>
+        <div className="divide-y rounded-xl border text-sm">
+          {rows.map((r) => (
+            <div key={r.productId} className="px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate">{product(r.productId)?.name ?? "Product"}</span>
+                {kind === "starterspakket" ? (
+                  <Input
+                    value={String(r.quantity)}
+                    inputMode="numeric"
+                    disabled={disabled}
+                    onChange={(e) =>
+                      update(r.productId, {
+                        quantity: Math.min(99, Math.max(1, Math.floor(Number(e.target.value) || 1))),
+                      })
+                    }
+                    className="h-8 w-16"
+                    aria-label="Aantal in het starterspakket"
+                  />
+                ) : null}
+                {!disabled ? (
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Uit het assortiment halen"
+                    onClick={() => onChange(items.filter((i) => i.productId !== r.productId))}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                ) : null}
+              </div>
+              {hidden(r.productId) ? (
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-amber-700">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Deze functie ziet de categorie van dit product niet in de winkel.
+                </p>
+              ) : null}
+            </div>
+          ))}
+          {!rows.length ? <p className="px-3 py-2 text-muted-foreground">{empty}</p> : null}
+          {!disabled && free.length ? (
+            <div className="px-3 py-2">
+              <NativeSelect
+                value=""
+                onChange={(e) =>
+                  e.target.value &&
+                  onChange([...items, { productId: e.target.value, kind, quantity: 1 }])
+                }
+                className="h-9 w-64"
+                aria-label={`Product toevoegen aan ${title.toLowerCase()}`}
+              >
+                <option value="">+ Product toevoegen…</option>
+                {free.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Aanbevolen producten staan bovenaan de winkel van deze functie. Het starterspakket
+        kunnen nieuwe medewerkers in één keer in hun winkelwagen leggen.
+      </p>
+      {list("aanbevolen", "Aanbevolen", "Nog geen aanbevolen producten.")}
+      {list("starterspakket", "Starterspakket", "Nog geen starterspakket.")}
+    </div>
   );
 }

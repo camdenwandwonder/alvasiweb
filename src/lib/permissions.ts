@@ -22,6 +22,11 @@ export const PERMISSION_GROUPS: { title: string; items: PermissionItem[] }[] = [
         hint: "Ziet in de winkel ook altijd de volledige catalogus.",
       },
       { key: "orders.approve", label: "Kan bestellingen en budgetaanvragen goedkeuren" },
+      {
+        key: "orders.order_for_others",
+        label: "Kan bestellen namens medewerkers",
+        hint: "Met de maat, het budget en de maxima van die medewerker.",
+      },
     ],
   },
   {
@@ -60,6 +65,7 @@ export const PERMISSION_REQUIRES: Record<string, string[]> = {
   "orders.cancel": ["orders.view_own"],
   "orders.view_all": ["orders.view_own"],
   "orders.approve": ["orders.view_all", "orders.view_own"],
+  "orders.order_for_others": ["orders.create", "users.view"],
   "users.invite": ["users.view"],
   "users.update": ["users.view"],
   "users.remove": ["users.view"],

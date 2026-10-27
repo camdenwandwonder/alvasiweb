@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Columns3,
   Eye,
+  PackageOpen,
   Loader2,
   Plus,
   ShieldCheck,
@@ -108,6 +109,9 @@ export function RolesTab({
                 ) : null}
                 <Row icon={Eye} label="Ziet" value={s.seesText} />
                 <Row icon={ShieldCheck} label="Goedkeuring" value={s.approvalText} />
+                {assortmentText(data, role.id) ? (
+                  <Row icon={PackageOpen} label="Assortiment" value={assortmentText(data, role.id)!} />
+                ) : null}
               </dl>
             </button>
           );
@@ -127,6 +131,16 @@ export function RolesTab({
       {comparing ? <CompareDialog data={data} onClose={() => setComparing(false)} /> : null}
     </div>
   );
+}
+
+function assortmentText(data: PersoneelData, roleId: string): string | null {
+  const rows = data.roleProducts.filter((r) => r.role_id === roleId);
+  if (!rows.length) return null;
+  const recommended = rows.filter((r) => r.kind === "aanbevolen").length;
+  const kit = rows.filter((r) => r.kind === "starterspakket").reduce((s, r) => s + r.quantity, 0);
+  return [recommended ? `${recommended} aanbevolen` : null, kit ? `pakket ${kit} stuks` : null]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function Row({

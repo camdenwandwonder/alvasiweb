@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUser, isMember } from "@/lib/auth/user";
-import { getAllowance } from "@/lib/allowance";
+import { getAllowanceFor } from "@/lib/allowance";
+import { getOrderRecipient } from "@/lib/shop/recipient";
 import { displayFor } from "@/lib/ordering";
 import { CartClient, type DeliveryAddress } from "./cart-client";
 
@@ -11,6 +12,8 @@ export default async function CartPage() {
   const user = await getCurrentUser();
   if (!user?.companyId) redirect("/login");
 
+  // When ordering on behalf of an employee, their budget and maxima apply.
+  const recipient = await getOrderRecipient(user);
   const [{ data: addresses }, { settings, allowance }] = await Promise.all([
     createAdminClient()
       .from("company_addresses")
@@ -18,7 +21,7 @@ export default async function CartPage() {
       .eq("company_id", user.companyId)
       .order("is_default", { ascending: false })
       .order("sort_order"),
-    getAllowance(user),
+    getAllowanceFor(user.companyId, recipient?.id ?? user.id),
   ]);
 
   return (
@@ -38,6 +41,7 @@ export default async function CartPage() {
       display={displayFor(settings, isMember(user) ? "member" : "manager")}
       payment={settings.payment}
       budgetRemaining={allowance.budget?.remaining ?? null}
+      recipient={recipient ? { name: recipient.name, roleName: recipient.roleName } : null}
     />
   );
 }

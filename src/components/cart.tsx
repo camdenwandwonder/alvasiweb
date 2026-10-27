@@ -38,14 +38,21 @@ const sameLine = (a: CartItem, p: string, v: string | null) =>
 
 export function CartProvider({
   companyId,
+  recipientId = null,
   children,
 }: {
   companyId: string;
+  /** Ordering on behalf of this employee: a separate cart, never mixed. */
+  recipientId?: string | null;
   children: React.ReactNode;
 }) {
-  const storageKey = `alvasi-cart-${companyId}`;
+  const storageKey = recipientId
+    ? `alvasi-cart-${companyId}-voor-${recipientId}`
+    : `alvasi-cart-${companyId}`;
   const [items, setItems] = useState<CartItem[]>([]);
-  const [ready, setReady] = useState(false);
+  // The key the current items were loaded from; saving under any other key
+  // would copy one person's cart into another's when switching recipient.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -54,12 +61,17 @@ export function CartProvider({
     } catch {
       setItems([]);
     }
-    setReady(true);
+    setLoadedKey(storageKey);
   }, [storageKey]);
 
   useEffect(() => {
-    if (ready) localStorage.setItem(storageKey, JSON.stringify(items));
-  }, [items, ready, storageKey]);
+    if (loadedKey !== storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(items));
+    } catch {
+      /* opslag vol of geblokkeerd: de winkelwagen werkt dan alleen in deze sessie */
+    }
+  }, [items, loadedKey, storageKey]);
 
   const value = useMemo<CartCtx>(() => {
     return {

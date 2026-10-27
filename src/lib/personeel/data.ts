@@ -75,6 +75,16 @@ export type PersoneelData = {
   visibility: Record<string, string[]>;
   allowances: Record<string, PersonAllowance>;
   pendingRequests: number;
+  /** Assortment per functie: recommended products and the starter kit. */
+  roleProducts: PRoleProduct[];
+};
+
+export type PRoleProduct = {
+  role_id: string;
+  product_id: string;
+  kind: "aanbevolen" | "starterspakket";
+  quantity: number;
+  sort_order: number;
 };
 
 function variantLabel(attrs: Record<string, unknown> | null): string {
@@ -100,6 +110,7 @@ export async function loadPersoneel(companyId: string): Promise<PersoneelData> {
     { data: orders },
     { count: pendingRequests },
     allowanceResult,
+    { data: roleProducts },
   ] = await Promise.all([
     admin.from("companies").select("name").eq("id", companyId).maybeSingle(),
     admin
@@ -150,6 +161,11 @@ export async function loadPersoneel(companyId: string): Promise<PersoneelData> {
       .eq("company_id", companyId)
       .eq("status", "pending"),
     computeAllowances(companyId),
+    admin
+      .from("role_products")
+      .select("role_id, product_id, kind, quantity, sort_order")
+      .eq("company_id", companyId)
+      .order("sort_order"),
   ]);
 
   const lastOrder = new Map<string, string>();
@@ -245,5 +261,12 @@ export async function loadPersoneel(companyId: string): Promise<PersoneelData> {
     visibility,
     allowances: Object.fromEntries(allowanceResult.byUser),
     pendingRequests: pendingRequests ?? 0,
+    roleProducts: (roleProducts ?? []).map((r) => ({
+      role_id: r.role_id as string,
+      product_id: r.product_id as string,
+      kind: r.kind === "starterspakket" ? "starterspakket" : "aanbevolen",
+      quantity: Number(r.quantity) || 1,
+      sort_order: Number(r.sort_order) || 0,
+    })),
   };
 }

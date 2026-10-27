@@ -166,6 +166,11 @@ function Body({ order }: { order: OrderDetail }) {
           <p className="truncate text-sm text-muted-foreground">
             {[order.role_name, order.ordered_by_email].filter(Boolean).join(" · ")}
           </p>
+          {order.placed_by_name ? (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              Geplaatst door {order.placed_by_name}
+            </p>
+          ) : null}
         </div>
       </section>
 

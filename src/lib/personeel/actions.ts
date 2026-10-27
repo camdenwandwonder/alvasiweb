@@ -333,6 +333,8 @@ export type RoleInput = {
   caps: { productId: string; max: number; period: string }[];
   /** null = all categories */
   categories: string[] | null;
+  /** Assortment for this functie; undefined = leave unchanged. */
+  products?: { productId: string; kind: "aanbevolen" | "starterspakket"; quantity: number }[];
 };
 
 function withDependencies(perms: string[]): string[] {
@@ -429,6 +431,7 @@ export async function saveRole(
       .from("role_permissions")
       .insert(permissions.map((permission) => ({ role_id: roleId, permission })));
 
+  let assortment: { kind: string; quantity: number }[] | null = null;
   if (manageRules) {
     const { data: company } = await admin
       .from("companies")
@@ -512,6 +515,30 @@ export async function saveRole(
       ids.map((role_id) => ({ company_id: companyId, category_id, role_id })),
     );
     if (insert.length) await admin.from("category_role_visibility").insert(insert);
+
+    // Assortment: recommended products and the starter kit of this functie.
+    if (input.products) {
+      const wanted = input.products.filter((p) => p.productId);
+      const ids = [...new Set(wanted.map((p) => p.productId))];
+      const { data: own } = ids.length
+        ? await admin.from("products").select("id").eq("company_id", companyId).in("id", ids)
+        : { data: [] };
+      const valid = new Set((own ?? []).map((p) => p.id as string));
+      const seen = new Set<string>();
+      const rowsToInsert = wanted
+        .filter((p) => valid.has(p.productId) && !seen.has(p.productId) && seen.add(p.productId))
+        .map((p, i) => ({
+          role_id: roleId!,
+          product_id: p.productId,
+          company_id: companyId,
+          kind: p.kind === "starterspakket" ? "starterspakket" : "aanbevolen",
+          quantity: Math.min(99, Math.max(1, Math.round(Number(p.quantity) || 1))),
+          sort_order: i,
+        }));
+      await admin.from("role_products").delete().eq("role_id", roleId!);
+      if (rowsToInsert.length) await admin.from("role_products").insert(rowsToInsert);
+      assortment = rowsToInsert;
+    }
   }
 
   await logAudit({
@@ -524,6 +551,12 @@ export async function saveRole(
       ? `Functie ${name} bijgewerkt${
           input.budget
             ? ` (budget ${input.budget.amount} ${PERIOD_LABEL[validPeriod(input.budget.period)]})`
+            : ""
+        }${
+          assortment
+            ? `; assortiment: ${assortment.filter((a) => a.kind === "aanbevolen").length} aanbevolen, pakket ${assortment
+                .filter((a) => a.kind === "starterspakket")
+                .reduce((s, a) => s + a.quantity, 0)} stuks`
             : ""
         }.`
       : `Functie ${name} aangemaakt.`,

@@ -1,6 +1,6 @@
 # Plan: een winkel die in één oogopslag laat zien wat je kunt bestellen
 
-Status: **plan, nog niet gebouwd** (28-10-2026).
+Status: **gebouwd** (28-10-2026). Bestellen namens: alleen met het recht "Kan bestellen namens medewerkers" (standaard bij managerfuncties).
 
 Doel: de winkel wordt compact, persoonlijk en snel. Een medewerker ziet direct wat hij
 mag bestellen, in zijn eigen maat, en heeft het met één klik in zijn winkelwagen. Een

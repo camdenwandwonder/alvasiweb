@@ -30,6 +30,9 @@ type Product = {
   base_price: number | null;
   credit_cost: number | null;
   max_quantity_per_order: number | null;
+  lead_time_days: number | null;
+  requires_proof: boolean;
+  requires_approval_override: boolean | null;
 };
 
 export function ProductEditor({
@@ -55,6 +58,11 @@ export function ProductEditor({
       ? String(product.max_quantity_per_order)
       : "",
   );
+  const [leadTime, setLeadTime] = useState(
+    product.lead_time_days != null ? String(product.lead_time_days) : "",
+  );
+  const [proof, setProof] = useState(!!product.requires_proof);
+  const [approval, setApproval] = useState(product.requires_approval_override === true);
   const [selections, setSelections] =
     useState<Record<string, string[]>>(initialSelections);
 
@@ -70,6 +78,13 @@ export function ProductEditor({
       description: description || null,
       base_price: price.trim() ? Number(price) : null,
       max_quantity_per_order: maxQty.trim() ? Number(maxQty) : null,
+      lead_time_days: leadTime.trim() ? Number(leadTime) : null,
+      requires_proof: proof,
+      requires_approval_override: approval
+        ? true
+        : product.requires_approval_override === false
+          ? false
+          : null,
       regenVariants,
       selections,
     };
@@ -92,7 +107,7 @@ export function ProductEditor({
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, status, description, price, maxQty, selections]);
+  }, [name, status, description, price, maxQty, leadTime, proof, approval, selections]);
 
   // Warn if leaving with a save still pending.
   useEffect(() => {
@@ -216,7 +231,10 @@ export function ProductEditor({
               </NativeSelect>
             </Field>
           </div>
-          <Field label="Omschrijving">
+          <Field
+            label="Omschrijving"
+            hint="1–3 korte zinnen. Staat in het productpaneel van de winkel."
+          >
             <Textarea
               rows={3}
               value={description}
@@ -243,7 +261,7 @@ export function ProductEditor({
                 placeholder="0,00"
               />
             </Field>
-            <Field label="Max. / bestelling" hint="Leeg = standaard">
+            <Field label="Maximaal per bestelling" hint="Leeg = geen maximum">
               <Input
                 type="number"
                 min="1"
@@ -254,6 +272,58 @@ export function ProductEditor({
                 }}
               />
             </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Levertijd in werkdagen"
+              hint="Wordt in de winkel getoond. Leeg = niet tonen."
+            >
+              <Input
+                type="number"
+                min="0"
+                value={leadTime}
+                onChange={(e) => {
+                  setLeadTime(e.target.value);
+                  touch();
+                }}
+              />
+            </Field>
+            <div className="space-y-2 pt-1">
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4"
+                  checked={proof}
+                  onChange={(e) => {
+                    setProof(e.target.checked);
+                    touch();
+                  }}
+                />
+                <span>
+                  <span className="font-medium">Proef vooraf</span>
+                  <span className="block text-xs text-muted-foreground">
+                    De besteller krijgt eerst een proef ter goedkeuring.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4"
+                  checked={approval}
+                  onChange={(e) => {
+                    setApproval(e.target.checked);
+                    touch();
+                  }}
+                />
+                <span>
+                  <span className="font-medium">Altijd goedkeuring nodig</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Bestellingen met dit product gaan altijd langs een goedkeurder.
+                  </span>
+                </span>
+              </label>
+            </div>
           </div>
         </CardContent>
       </Card>
